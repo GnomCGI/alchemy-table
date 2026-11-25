@@ -2,7 +2,7 @@
 
 **Калькулятор зелий для Skyrim Special Edition и Anniversary Edition.** Сумку с ингредиентами можно загрузить прямо из сейва. Страница покажет все зелья и яды, которые можно сварить прямо сейчас, и подберёт лучший рецепт под нужные эффекты.
 
-**[Открыть Alchemy Table →](https://gnomcgi.github.io/alchemy-table/)** · [English README](README.md)
+**[Открыть Alchemy Table →](https://gnomcgi.github.io/alchemy-table/)** · [Nexus Mods](https://www.nexusmods.com/skyrimspecialedition/mods/200533) · [English README](README.md)
 
 ![Что я могу сварить](screenshots/brew-ru.png)
 
@@ -18,7 +18,7 @@
 
 ## Как пользоваться
 
-1. Открой [веб-версию](https://gnomcgi.github.io/alchemy-table/) или скачай `index.html` (из репозитория или с Nexus) и открой его в браузере.
+1. Открой [веб-версию](https://gnomcgi.github.io/alchemy-table/) или скачай `index.html` из репозитория или с [Nexus Mods](https://www.nexusmods.com/skyrimspecialedition/mods/200533) и открой его в браузере.
 2. Сохранись в игре и нажми **Обновить сумку из игры**. В первый раз укажи папку `Документы\My Games\Skyrim Special Edition\Saves` (GOG: `Skyrim Special Edition GOG\Saves`). В окне выбора видны только папки, а сами сейвы нет, так и должно быть.
    - **Chrome / Edge:** папку выбираешь один раз. Сразу после выбора и при следующих заходах браузер спрашивает разрешение на доступ к папке Saves (в некоторых версиях там написано «просмотр и редактирование файлов»). Выбери **Разрешать при каждом посещении**, и дальше один клик читает самый свежий сейв. Страница только читает сейвы и ничего в них не меняет.
    - **Firefox:** папку нужно выбирать каждый раз. Есть и другие способы: **Выбрать файл сейва** или перетащить файл `.ess` на страницу.
@@ -49,4 +49,4 @@
 
 [MIT](LICENSE). Alchemy Table — неофициальный фанатский инструмент, он не связан с Bethesda Softworks и ZeniMax Media. *The Elder Scrolls* и *Skyrim* являются товарными знаками ZeniMax Media Inc. Игровые данные (названия ингредиентов, эффекты, значения) принадлежат их владельцам и используются только для работы калькулятора.
 
-Если инструмент сэкономил тебе время, поставь endorsement на Nexus: так его найдут другие игроки.
+Если инструмент сэкономил тебе время, поставь [endorsement на Nexus](https://www.nexusmods.com/skyrimspecialedition/mods/200533): так его найдут другие игроки.

@@ -2,7 +2,7 @@
 
 **A potion calculator for Skyrim Special Edition and Anniversary Edition.** You can load your ingredient bag straight from your save file, and the page shows every potion and poison you can brew right now. It can also find the best recipe for the effects you want.
 
-**[Open Alchemy Table →](https://gnomcgi.github.io/alchemy-table/)** · [Русская версия README](README.ru.md)
+**[Open Alchemy Table →](https://gnomcgi.github.io/alchemy-table/)** · [Nexus Mods](https://www.nexusmods.com/skyrimspecialedition/mods/200533) · [Русская версия README](README.ru.md)
 
 ![What can I brew](screenshots/brew-en.png)
 
@@ -20,7 +20,7 @@
 
 ## How to use
 
-1. Open the [web version](https://gnomcgi.github.io/alchemy-table/), or download `index.html` (from this repo or from Nexus) and open it in your browser.
+1. Open the [web version](https://gnomcgi.github.io/alchemy-table/), or download `index.html` from this repo or from [Nexus Mods](https://www.nexusmods.com/skyrimspecialedition/mods/200533) and open it in your browser.
 2. Save your game, then press **Update bag from game**. The first time, pick the folder `Documents\My Games\Skyrim Special Edition\Saves` (GOG: `Skyrim Special Edition GOG\Saves`). The picker shows folders only, so you won't see the save files themselves. That's expected.
    - **Chrome / Edge:** pick the folder once. Right after that, and when you open the page again later, the browser asks for permission to access the Saves folder ("view and edit files" in some versions). Choose **Allow on every visit**, and from then on one click reads the newest save. The page only reads saves and never changes them.
    - **Firefox:** pick the folder each time. Alternatively, use **Pick a save file**, or drag an `.ess` file onto the page.
@@ -51,4 +51,4 @@ You can also skip the save import entirely and set counts by hand with the + and
 
 [MIT](LICENSE). Alchemy Table is an unofficial fan tool and is not affiliated with Bethesda Softworks or ZeniMax Media. *The Elder Scrolls* and *Skyrim* are trademarks of ZeniMax Media Inc. The game data in this tool (ingredient names, effects and values) belongs to its owners and is used only to make the calculator work.
 
-If the tool saved you some time, an endorsement on Nexus helps other players find it.
+If the tool saved you some time, an [endorsement on Nexus](https://www.nexusmods.com/skyrimspecialedition/mods/200533) helps other players find it.
