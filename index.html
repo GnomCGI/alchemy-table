@@ -1,0 +1,873 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alchemy Table</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Skyrim Special Edition alchemy calculator: what you can brew from your bag, how to brew what you need, bag import from your save.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Philosopher:wght@400;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+body{margin:0}img{max-width:100%}
+/* Layout: two-pane workbench — ingredient bag on the left, brewing results on the right; stacks on phones */
+:root{
+  --bg:#ECF0EB; --surface:#F8FAF7; --sunk:#E2E8E2; --fg:#1B2520; --muted:#5B6A61; --line:#CBD4CC;
+  --accent:#8C5719; --accent-soft:#F1E3CF; --good:#2D7448; --good-soft:#DCEEE1; --bad:#A1352E; --bad-soft:#F5DEDA;
+  --display:"Philosopher", Georgia, "Times New Roman", serif;
+  --body:"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111714; --surface:#18201C; --sunk:#0D1210; --fg:#E2E9E3; --muted:#93A299; --line:#2A3630;
+  --accent:#D79B52; --accent-soft:#3A2B18; --good:#71C48F; --good-soft:#173324; --bad:#E5807A; --bad-soft:#3B1D1B; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111714; --surface:#18201C; --sunk:#0D1210; --fg:#E2E9E3; --muted:#93A299; --line:#2A3630;
+  --accent:#D79B52; --accent-soft:#3A2B18; --good:#71C48F; --good-soft:#173324; --bad:#E5807A; --bad-soft:#3B1D1B; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html[lang="en"] [data-lang="ru"],html[lang="ru"] [data-lang="en"]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--display);font-weight:700;text-wrap:balance;margin:0}
+h1{font-size:30px;letter-spacing:.01em}
+h2{font-size:19px}
+.sub{color:var(--muted);margin:2px 0 0}
+header.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:end;justify-content:space-between}
+.topctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tabs{display:flex;gap:4px;background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:4px}
+.tabs button{border:0;background:transparent;color:var(--muted);font:600 14px var(--body);padding:8px 14px;border-radius:7px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgb(0 0 0 / .12)}
+.langs{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.langs button{border:0;background:var(--surface);color:var(--muted);font:600 12px var(--mono);padding:7px 10px;cursor:pointer}
+.langs button[aria-pressed="true"]{background:var(--accent);color:var(--surface)}
+.iconbtn{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:600}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.settings{background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.settings summary{cursor:pointer;padding:10px 14px;font-weight:600;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.settings summary .hint{color:var(--muted);font-weight:400;font-size:13px}
+.set-grid{display:flex;flex-wrap:wrap;gap:12px 22px;padding:4px 14px 14px;align-items:center}
+.set-grid label{display:flex;gap:8px;align-items:center}
+.set-grid input[type=range]{width:140px;accent-color:var(--accent)}
+.set-grid input[type=number],.set-grid select{width:76px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.set-grid input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:16px;align-items:start}
+@media (max-width:880px){.grid{grid-template-columns:minmax(0,1fr)}}
+.pane{background:var(--surface);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-width:0}
+.pane-head{padding:14px 14px 10px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--line)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.search{flex:1 1 180px;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.chipbtn{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:4px 10px;font-size:13px;cursor:pointer;color:var(--muted)}
+.chipbtn[aria-pressed="true"]{border-color:var(--accent);color:var(--fg);background:var(--accent-soft)}
+.linkbtn{border:0;background:none;color:var(--accent);cursor:pointer;padding:4px 2px;font-weight:500}
+.list{max-height:72vh;overflow:auto;padding:6px}
+.ing{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:8px;border-radius:8px}
+.ing+.ing{border-top:1px solid var(--line)}
+.ing.owned{background:var(--accent-soft)}
+.ico{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:var(--sunk);color:var(--accent)}
+.ico svg{width:20px;height:20px}
+.ing-name{font-weight:600;min-width:0;overflow-wrap:anywhere}
+.badge{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-left:6px;font-weight:500;white-space:nowrap}
+.beta{font:600 10px var(--mono);letter-spacing:.08em;background:var(--accent);color:var(--surface);border-radius:4px;padding:1px 5px;vertical-align:1px}
+.effs{grid-column:2 / 4;display:flex;flex-wrap:wrap;gap:4px}
+.eff{font-size:12px;border-radius:5px;padding:1px 6px;background:var(--good-soft);color:var(--good)}
+.eff.neg{background:var(--bad-soft);color:var(--bad)}
+.eff.hit{outline:1.5px solid currentColor}
+.step{display:flex;align-items:center;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--bg)}
+.step button{border:0;background:transparent;width:30px;height:30px;cursor:pointer;font-size:16px;color:var(--muted)}
+.step button:hover{color:var(--fg)}
+.step input{width:40px;text-align:center;border:0;background:transparent;padding:0;font-family:var(--mono);-moz-appearance:textfield}
+.step input::-webkit-inner-spin-button{-webkit-appearance:none}
+.empty{color:var(--muted);padding:24px 14px;text-align:center}
+.results{display:flex;flex-direction:column;gap:10px;padding:12px}
+.card{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
+.card-top{display:flex;gap:10px;justify-content:space-between;align-items:start;flex-wrap:wrap}
+.pname{font-family:var(--display);font-size:17px;font-weight:700}
+.kind{font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;border-radius:4px;padding:1px 6px;margin-right:6px;vertical-align:2px}
+.kind.potion{background:var(--good-soft);color:var(--good)}
+.kind.poison{background:var(--bad-soft);color:var(--bad)}
+.meta{display:flex;gap:14px;color:var(--muted);font-size:13px;flex-wrap:wrap}
+.meta b{color:var(--fg)}
+.recipe{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.rpill{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:2px 10px 2px 3px;font-size:13px;background:var(--surface)}
+.rpill .ico{width:22px;height:22px;border-radius:999px}
+.rpill .ico svg{width:14px;height:14px}
+.rpill.miss{border-style:dashed;color:var(--muted)}
+.rpill small{color:var(--muted);margin-left:2px}
+.rpill b{color:var(--accent);font-weight:500}
+.rpill.limit{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.plus{color:var(--muted);align-self:center;font-weight:600}
+.rlabel{font-size:12.5px;color:var(--muted)}
+.efflines{display:flex;flex-direction:column;gap:3px}
+.efl{display:flex;gap:10px;justify-content:space-between;font-size:13px}
+.efl span:first-child::before{content:"";display:inline-block;width:7px;height:7px;border-radius:2px;background:var(--good);margin-right:8px;vertical-align:1px}
+.efl.neg span:first-child::before{background:var(--bad)}
+.efl.neg{color:var(--bad)}
+.efl .num{color:var(--muted);white-space:nowrap}
+.impure{font-size:12px;color:var(--bad)}
+.more{align-self:center}
+.wanted{display:flex;flex-wrap:wrap;gap:6px}
+.wchip{display:flex;align-items:center;gap:6px;border-radius:999px;padding:3px 4px 3px 10px;font-size:13px;background:var(--good-soft);color:var(--good)}
+.wchip.neg{background:var(--bad-soft);color:var(--bad)}
+.wchip button{border:0;background:transparent;color:inherit;cursor:pointer;width:20px;height:20px;border-radius:999px}
+select.big{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);flex:1 1 220px;min-width:0}
+.holders{display:flex;flex-direction:column;gap:6px;padding:0 12px 4px}
+.holders h3{font-size:14px;font-family:var(--body);font-weight:600;color:var(--muted);margin-top:6px}
+.note{color:var(--muted);font-size:12.5px;margin:0;max-width:110ch}
+.sample{font-size:12.5px;background:var(--accent-soft);color:var(--fg);border-radius:8px;padding:8px 10px}
+.gamebar{display:flex;flex-direction:column;gap:6px;background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px;padding:10px 12px}
+.gamebar .row{justify-content:space-between}
+.primary{border:0;background:var(--accent);color:var(--surface);font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+.primary:hover{filter:brightness(1.08)}
+.primary[disabled]{opacity:.6;cursor:progress}
+.gstat{font-size:12.5px;color:var(--muted)}
+.gstat.err{color:var(--bad)}
+.gstat b{color:var(--fg)}
+body.drag .wrap{outline:2px dashed var(--accent);outline-offset:6px;border-radius:12px}
+footer.foot{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:12px}
+footer.foot a{color:var(--accent)}
+dialog.help{max-width:min(720px,calc(100vw - 32px));max-height:min(86vh,900px);border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--fg);padding:0}
+dialog.help::backdrop{background:rgb(0 0 0 / .45)}
+.help-in{padding:20px 22px 22px;overflow:auto;max-height:inherit}
+.help-in h2{font-size:22px;margin-bottom:8px}
+.help-in h3{font-size:16px;margin:16px 0 4px}
+.help-in p,.help-in li{max-width:68ch}
+.help-in ol,.help-in ul{padding-left:20px;margin:6px 0}
+.help-in li+li{margin-top:4px}
+.help-in code{font-family:var(--mono);font-size:12.5px;background:var(--sunk);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+.help-close{position:sticky;top:0;float:right;margin:-6px -8px 0 8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Alchemy Table</h1>
+      <p class="sub" id="sub"></p>
+    </div>
+    <div class="topctl">
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tab-brew" aria-selected="true" data-t="tabBrew"></button>
+        <button role="tab" id="tab-find" aria-selected="false" data-t="tabFind"></button>
+      </div>
+      <div class="langs" role="group" aria-label="Language">
+        <button data-setlang="en" aria-pressed="true">EN</button>
+        <button data-setlang="ru" aria-pressed="false">RU</button>
+      </div>
+      <button class="iconbtn" id="help-open" data-t="help"></button>
+    </div>
+  </header>
+
+  <details class="settings" id="settings">
+    <summary><span data-t="settings"></span> <span class="hint" id="set-hint"></span></summary>
+    <div class="set-grid">
+      <label for="s-skill"><span data-t="skill"></span> <input type="range" id="s-skill" min="15" max="100" step="1"> <span class="num" id="s-skill-v"></span></label>
+      <label for="s-alch"><span data-t="perk"></span> <select id="s-alch"><option value="0" data-t="none"></option><option value="1">1/5</option><option value="2">2/5</option><option value="3">3/5</option><option value="4">4/5</option><option value="5">5/5</option></select></label>
+      <label for="s-phys"><input type="checkbox" id="s-phys"> <span data-t="phys"></span></label>
+      <label for="s-bene"><input type="checkbox" id="s-bene"> <span data-t="bene"></span></label>
+      <label for="s-pois"><input type="checkbox" id="s-pois"> <span data-t="pois"></span></label>
+      <label for="s-pure"><input type="checkbox" id="s-pure"> <span data-t="pure"></span></label>
+      <label for="s-fort"><span data-t="fort"></span> <input type="number" id="s-fort" min="0" max="200" step="1"></label>
+    </div>
+  </details>
+
+  <div class="grid">
+    <section class="pane" id="pane-ings">
+      <div class="pane-head">
+        <div class="row"><h2 data-t="bag"></h2><span class="sub" id="own-count"></span></div>
+        <div class="gamebar">
+          <div class="row">
+            <button class="primary" id="game-load"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg><span data-t="gameLoad"></span> <span class="beta">BETA</span></button>
+            <button class="linkbtn" id="game-file" data-t="gameFile"></button>
+          </div>
+          <div class="gstat" id="game-stat"></div>
+          <input type="file" id="game-input" accept=".ess" hidden>
+          <input type="file" id="game-dir" webkitdirectory hidden>
+        </div>
+        <div class="row">
+          <input class="search" id="ing-search" type="search" data-tp="searchIng" autocomplete="off">
+        </div>
+        <div class="row">
+          <button class="chipbtn" id="f-owned" aria-pressed="false" data-t="owned"></button>
+          <button class="linkbtn" id="clear-inv" data-t="clear"></button>
+        </div>
+        <div class="sample" id="sample-note" hidden data-t="sample"></div>
+      </div>
+      <div class="list" id="ing-list"></div>
+    </section>
+
+    <section class="pane" id="pane-brew">
+      <div class="pane-head">
+        <div class="row"><h2 data-t="brewH"></h2><span class="sub" id="brew-count"></span></div>
+        <div class="row">
+          <button class="chipbtn" data-kind="all" aria-pressed="true" data-t="all"></button>
+          <button class="chipbtn" data-kind="potion" aria-pressed="false" data-t="potions"></button>
+          <button class="chipbtn" data-kind="poison" aria-pressed="false" data-t="poisons"></button>
+          <button class="chipbtn" id="f-pure" aria-pressed="false" data-t="noSide"></button>
+        </div>
+        <div class="row">
+          <input class="search" id="brew-search" type="search" data-tp="brewSearch" autocomplete="off">
+          <select class="big" id="brew-sort" style="flex:0 1 220px">
+            <option value="value" data-t="sortValue"></option>
+            <option value="count" data-t="sortCount"></option>
+            <option value="effects" data-t="sortEff"></option>
+          </select>
+        </div>
+      </div>
+      <div class="results" id="brew-results"></div>
+    </section>
+
+    <section class="pane" id="pane-find" hidden>
+      <div class="pane-head">
+        <div class="row"><h2 data-t="findH"></h2></div>
+        <div class="row"><select class="big" id="eff-pick"></select></div>
+        <div class="wanted" id="wanted"></div>
+        <div class="row">
+          <button class="chipbtn" id="f-onlymine" aria-pressed="false" data-t="onlyMine"></button>
+          <button class="chipbtn" id="f-clean" aria-pressed="true" data-t="clean"></button>
+        </div>
+      </div>
+      <div class="holders" id="holders"></div>
+      <div class="results" id="find-results"></div>
+    </section>
+  </div>
+
+  <footer class="foot">
+    <p class="note" data-t="note"></p>
+    <p class="note"><b>Alchemy Table v1.0.0</b> · <span data-t="disclaimer"></span> · <a href="https://github.com/GnomCGI/alchemy-table" target="_blank" rel="noopener">GitHub</a> · MIT</p>
+  </footer>
+</div>
+
+<dialog class="help" id="help">
+  <div class="help-in">
+    <button class="iconbtn help-close" id="help-close" data-t="close"></button>
+    <div data-lang="en">
+      <h2>How to use Alchemy Table</h2>
+      <p>A calculator for Skyrim Special Edition and Anniversary Edition alchemy. It shows every potion and poison you can brew from your ingredients and finds recipes for the effects you need. Everything runs in your browser: no account, no uploads.</p>
+      <h3>1. Fill your bag</h3>
+      <ul>
+        <li><b>Update bag from game</b> reads your newest save: the ingredients, plus your Alchemy skill and alchemy perks. In Chrome or Edge you pick the Saves folder once. Right after that, and when you come back later, the browser asks for access to Saves: choose <b>Allow on every visit</b>, and from then on one click is enough. The page only reads saves and never changes them. In Firefox you pick the folder each time.</li>
+        <li><b>Pick a save file</b> or drag an <code>.ess</code> file onto the page works in any browser.</li>
+        <li>Or set the counts yourself with <b>+</b> and <b>−</b>.</li>
+      </ul>
+      <p>Saves live in <code>Documents\My Games\Skyrim Special Edition\Saves</code> (GOG: <code>Skyrim Special Edition GOG\Saves</code>). Save in game first: the tool reads the save, not the running game.</p>
+      <h3>2. Set up your alchemist</h3>
+      <p>Open <b>My alchemist</b> and set your Alchemy skill, the Alchemist perk rank, Physician, Benefactor, Poisoner, Purity and any Fortify Alchemy gear. Save import fills the skill and perks for you. Fortify Alchemy from gear you set by hand. Strength and value follow the game's formulas.</p>
+      <h3>3. What can I brew</h3>
+      <p>Every potion and poison you can make from what's in the bag, most valuable first. Each card shows what to put in the cauldron (one of each per potion), how many you can brew, and which ingredient runs out first.</p>
+      <h3>4. Brew what I need</h3>
+      <p>Pick up to three effects. You'll see the ingredients that carry them and the best combinations, with the ones you can brew right now on top.</p>
+      <h3>Save import (beta)</h3>
+      <ul>
+        <li>Works with any load order and with mods installed.</li>
+        <li>Knows the base game, Dawnguard, Hearthfire, Dragonborn and the Creation Club Fishing, Rare Curios and Saints &amp; Seducers ingredients (all included in Anniversary Edition). Ingredients added by other mods are skipped.</li>
+        <li>Skyrim SE / AE saves only. Oldrim (Legendary Edition) saves aren't supported.</li>
+        <li>If the counts look wrong, please open an issue on GitHub or post on Nexus and attach the save.</li>
+      </ul>
+      <h3>Good to know</h3>
+      <ul>
+        <li>Mods that change alchemy (CACO, Requiem and similar) aren't accounted for.</li>
+        <li>Numbers can differ from the game by 1 because of rounding.</li>
+        <li>Your bag and settings are kept in this browser only.</li>
+      </ul>
+    </div>
+    <div data-lang="ru">
+      <h2>Как пользоваться Alchemy Table</h2>
+      <p>Калькулятор алхимии для Skyrim Special Edition и Anniversary Edition. Показывает все зелья и яды, которые можно сварить из твоих ингредиентов, и подбирает рецепты под нужные эффекты. Всё работает в браузере: без регистрации, файлы никуда не отправляются.</p>
+      <h3>1. Заполни сумку</h3>
+      <ul>
+        <li><b>Обновить сумку из игры</b> читает самый свежий сейв: ингредиенты, а заодно навык алхимии и перки алхимии. В Chrome и Edge папку Saves выбираешь один раз. Сразу после этого и при следующих заходах браузер спрашивает доступ к Saves: выбери <b>Разрешать при каждом посещении</b>, и дальше хватает одного клика. Страница только читает сейвы и ничего в них не меняет. В Firefox папку нужно выбирать каждый раз.</li>
+        <li><b>Выбрать файл сейва</b> или перетащить файл <code>.ess</code> на страницу работает в любом браузере.</li>
+        <li>Или поставь количества сам кнопками <b>+</b> и <b>−</b>.</li>
+      </ul>
+      <p>Сейвы лежат в <code>Документы\My Games\Skyrim Special Edition\Saves</code> (GOG: <code>Skyrim Special Edition GOG\Saves</code>). Сначала сохранись в игре: читается сейв, а не запущенная игра.</p>
+      <h3>2. Настрой алхимика</h3>
+      <p>Открой <b>Мой алхимик</b> и укажи навык алхимии, ранг перка «Алхимик», перки Врач, Благодетель, Отравитель, Чистота и усиление алхимии от экипировки. Импорт из сейва выставляет навык и перки сам, усиление от экипировки ставится вручную. Сила и цена считаются по формулам игры.</p>
+      <h3>3. Что я могу сварить</h3>
+      <p>Все зелья и яды из того, что лежит в сумке, сначала самые дорогие. На карточке видно, что положить в котёл (по одному каждого на зелье), сколько штук выйдет и какой ингредиент кончится первым.</p>
+      <h3>4. Как сварить нужное</h3>
+      <p>Выбери до трёх эффектов. Появятся ингредиенты с ними и лучшие сочетания, сверху те, что можно сварить прямо сейчас.</p>
+      <h3>Импорт из сейва (бета)</h3>
+      <ul>
+        <li>Работает с любым порядком загрузки и с установленными модами.</li>
+        <li>Знает ингредиенты основной игры, Dawnguard, Hearthfire, Dragonborn и Creation Club: Рыбалка, Редкие диковинки, Saints &amp; Seducers (всё это входит в Anniversary Edition). Ингредиенты из других модов пропускаются.</li>
+        <li>Только сейвы SE / AE. Сейвы старого Skyrim (Legendary Edition) не поддерживаются.</li>
+        <li>Если количества не сходятся, напиши на GitHub или Nexus и приложи сейв.</li>
+      </ul>
+      <h3>Полезно знать</h3>
+      <ul>
+        <li>Моды, меняющие алхимию (CACO, Requiem и похожие), не учитываются.</li>
+        <li>Числа могут отличаться от игры на 1 из-за округления.</li>
+        <li>Сумка и настройки хранятся только в этом браузере.</li>
+      </ul>
+    </div>
+  </div>
+</dialog>
+
+<script>
+const VERSION="1.0.0";
+const DATA={"E":[["AlchRestoreStamina","Restore Stamina","Восстановление запаса сил",2099712,0.6],["AlchDamageStaminaRate","Damage Stamina Regen","Повреждение регенерации запаса сил",4196359,0.3],["AlchDamageHealthRavage","Ravage Health","Опустошение здоровья",2099207,0.4],["AlchResistFrost","Resist Frost","Сопротивление холоду",2101250,0.5],["AlchWeaknessFrost","Weakness to Frost","Уязвимость к холоду",2101255,0.5],["AlchFortifySneak","Fortify Sneak","Повышение навыка: скрытность",2099202,0.5],["AlchWeaknessPoison","Weakness to Poison","Уязвимость к яду",2101255,1.0],["AlchFortifyRestoration","Fortify Restoration","Повышение навыка: восстановление",2099202,0.5],["AlchDamageHealth","Damage Health","Урон здоровью",2099205,3.0],["AlchFortifyAlteration","Fortify Alteration","Повышение навыка: изменение",2099202,0.2],["AlchDamageSpeed","Slow","Замедление",4200455,1.0],["AlchFortifyCarryWeight","Fortify Carry Weight","Повышение переносимого веса",2099202,0.15],["AlchDamageStamina","Damage Stamina","Урон запасу сил",2099205,1.8],["AlchInfluenceConfDown","Fear","Страх",2099463,5.0],["AlchFortifyMagicka","Fortify Magicka","Повышение магии",2099202,0.3],["AlchWaterbreathing","Waterbreathing","Водное дыхание",4197378,30.0],["AlchParalysis","Paralysis","Паралич",4197379,500.0],["AlchRestoreMagicka","Restore Magicka","Восстановление магии",2099712,0.6],["AlchWeaknessMagic","Weakness to Magic","Уязвимость к магии",2101255,1.0],["AlchFortifyIllusion","Fortify Illusion","Повышение навыка: иллюзия",2099202,0.4],["AlchFortifyMagickaRate","Regenerate Magicka","Регенерация магии",2099202,0.1],["AlchDamageHealthDuration","Lingering Damage Health","Затяжной урон здоровью",2099205,12.0],["AlchFortifyStaminaRate","Regenerate Stamina","Регенерация запаса сил",2099202,0.1],["AlchWeaknessFire","Weakness to Fire","Уязвимость к огню",2101255,0.6],["AlchInvisibillity","Invisibility","Невидимость",4201474,100.0],["AlchResistMagic","Resist Magic","Сопротивление магии",2103298,1.0],["AlchFortifyBlock","Fortify Block","Повышение навыка: блокирование",2099202,0.5],["AlchFortifyLightArmor","Fortify Light Armor","Повышение навыка: легкая броня",2099202,0.5],["AlchDamageStaminaRavage","Ravage Stamina","Опустошение запаса сил",2099205,1.6],["AlchWeaknessShock","Weakness to Shock","Уязвимость к электричеству",2101255,0.7],["AlchResistPoison","Resist Poison","Сопротивление ядам",2101250,0.5],["AlchFortifyDestruction","Fortify Destruction","Повышение навыка: разрушение",2099202,0.5],["AlchFortifyOneHanded","Fortify One-handed","Повышение навыка: одноручное оружие",2099202,0.5],["AlchResistShock","Resist Shock","Сопротивление электричеству",2101250,0.5],["AlchResistFire","Resist Fire","Сопротивление огню",2101250,0.5],["AlchFortifyConjuration","Fortify Conjuration","Повышение навыка: колдовство",2099202,0.25],["AlchDamageStaminaDuration","Lingering Damage Stamina","Затяжной урон запасу сил",2099205,1.8],["AlchFortifyStamina","Fortify Stamina","Повышение запаса сил",2099202,0.3],["AlchDamageMagicka","Damage Magicka","Урон магии",2099205,2.2],["AlchRestoreHealth","Restore Health","Восстановление здоровья",2099712,0.5],["AlchFortifyHeavyArmor","Fortify Heavy Armor","Повышение навыка: тяжелая броня",2099202,0.5],["AlchFortifySmithing","Fortify Smithing","Повышение навыка: кузнечное дело",2099202,0.75],["AlchFortifyHealth","Fortify Health","Повышение здоровья",2099202,0.35],["AlchDamageMagickaRate","Damage Magicka Regen","Повреждение регенерации магии",4196359,0.5],["AlchCureDisease","Cure Disease","Исцеление болезней",2103808,0.5],["AlchFortifyLockpicking","Fortify Lockpicking","Повышение навыка: взлом",2099202,0.5],["AlchFortifyPickpocket","Fortify Pickpocket","Повышение навыка: карманные кражи",2099202,0.5],["AlchDamageMagickaDuration","Lingering Damage Magicka","Затяжной урон магии",2099205,10.0],["AlchInfluenceAggUp","Frenzy","Бешенство",2099463,15.0],["AlchFortifyHealRate","Regenerate Health","Регенерация здоровья",2099202,0.1],["AlchDamageMagickaRavage","Ravage Magicka","Опустошение магии",2099205,1.0],["AlchFortifyTwoHanded","Fortify Two-handed","Повышение навыка: двуручное оружие",2099202,0.5],["AlchFortifyMarksman","Fortify Marksman","Повышение искусства лучника",2099202,0.5],["AlchFortifyBarter","Fortify Barter","Повышение искусства торговли",2099202,2.0],["AlchFortifyEnchanting","Fortify Enchanting","Повышение навыка: зачарование",2099202,0.6],["AlchFortifyPersuasion","Fortify Persuasion","Повышение искусства убеждать",2099202,0.5],["ccBGSSSE037_NightEyeEffect","Night Eye","Ночной глаз",138545408,0.75],["ccBGSSSE037_RaceBretonAbsorbSpellChance","Spell Absorption","Поглощение заклинаний",4194306,0.1],["ccBGSSSE037_LightFFSelf","Light","Свет",4198400,0.5],["AlchCurePoison","Cure Poison","Противоядие",2103808,0.2]],"I":[["CritterPondFish01Ingredient","Silverside Perch","Серебристый окунь","S",15,0.25,[[0,5.0,0],[1,100.0,5],[2,2.0,10],[3,3.0,60]]],["CritterPondFish02Ingredient","Abecean Longfin","Абесинский окунь","S",15,0.5,[[4,3.0,30],[5,4.0,60],[6,2.0,30],[7,4.0,60]]],["CritterPondFish03Ingredient","River Betty","Бойцовая рыбка","S",15,0.25,[[8,5.0,0],[9,4.0,60],[10,50.0,5],[11,4.0,300]]],["CritterPondFish04Ingredient","Cyrodilic Spadetail","Сиродильский лопатохвост","S",15,0.25,[[12,3.0,0],[7,4.0,60],[13,1.0,30],[2,2.0,10]]],["CritterPondFish05Ingredient","Histcarp","Хисткарп","S",6,0.25,[[0,5.0,0],[14,4.0,60],[1,100.0,5],[15,0.0,5]]],["HumanFlesh","Human Flesh","Человечье мясо","S",1,0.25,[[8,2.0,1],[16,0.0,1],[17,5.0,0],[5,4.0,60]]],["DwarvenOil","Dwarven Oil","Двемерское масло","S",15,0.25,[[18,2.0,30],[19,4.0,60],[20,5.0,300],[17,5.0,0]]],["MoraTapinellaBits","Mora Tapinella","Мора тапинелла","S",4,0.25,[[17,5.0,0],[21,1.0,10],[22,5.0,300],[19,4.0,60]]],["MoonSugar","Moon Sugar","Лунный сахар","S",50,0.25,[[23,3.0,30],[3,3.0,60],[17,5.0,0],[20,5.0,300]]],["NirnrootRed","Crimson Nirnroot","Алый корень Нирна","S",10,0.2,[[8,6.0,1],[12,9.0,0],[24,0.0,4],[25,1.0,60]]],["BeeHoneyComb","Honeycomb","Медовые соты","S",5,1.0,[[0,5.0,0],[26,2.0,60],[27,2.0,60],[28,2.0,10]]],["CritterBeeIngredient","Bee","Пчела","S",3,0.1,[[0,5.0,0],[28,2.0,10],[22,5.0,300],[29,3.0,30]]],["BeeHiveHusk","Beehive Husk","Пчелиное гнездо","S",5,1.0,[[30,2.0,60],[27,2.0,60],[5,2.0,60],[31,5.0,60]]],["PearlSmall","Small Pearl","Маленькая жемчужина","S",2,0.1,[[0,5.0,0],[32,4.0,60],[7,4.0,60],[3,3.0,60]]],["Pearl","Pearl","Жемчужина","S",2,0.1,[[0,5.0,0],[26,4.0,60],[17,5.0,0],[33,3.0,60]]],["FavorThadgeirAshes","Berit's Ashes","Прах Берита","S",5,0.2,[[12,3.0,0],[34,3.0,60],[35,5.0,60],[28,2.0,10]]],["PowderedMammothTusk","Powdered Mammoth Tusk","Толченый бивень мамонта","S",2,0.1,[[0,5.0,0],[5,4.0,60],[23,3.0,30],[13,1.0,30]]],["WispWrappings","Wisp Wrappings","Пелена дымка","S",2,0.1,[[0,5.0,0],[31,5.0,60],[11,4.0,300],[25,1.0,60]]],["AntlersSmall","Small Antlers","Маленькие рога","S",2,0.1,[[6,2.0,30],[7,4.0,60],[36,1.0,10],[8,2.0,1]]],["AntlersLarge","Large Antlers","Большие рога","S",2,0.1,[[0,5.0,0],[37,4.0,60],[10,5.0,30],[1,100.0,5]]],["SabrecatEyeball","Eye of Sabre Cat","Глаз саблезуба","S",2,0.1,[[0,5.0,0],[2,2.0,10],[38,3.0,0],[39,5.0,0]]],["SabrecatTooth","Sabre Cat Tooth","Клык саблезуба","S",2,0.1,[[0,5.0,0],[40,2.0,60],[41,4.0,30],[6,2.0,30]]],["BearClaws","Bear Claws","Медвежьи когти","S",2,0.1,[[0,4.0,0],[42,4.0,60],[32,4.0,60],[43,100.0,5]]],["MudcrabChitin","Mudcrab Chitin","Клешня грязевого краба","S",2,0.25,[[0,5.0,0],[44,5.0,0],[30,4.0,60],[34,3.0,60]]],["BirdEgg03","Chicken's Egg","Куриное яйцо","S",2,0.5,[[25,1.0,60],[43,100.0,5],[15,0.0,5],[36,1.0,10]]],["BirdEgg02","Pine Thrush Egg","Яйцо соснового дрозда","S",2,0.5,[[0,5.0,0],[45,2.0,30],[6,2.0,30],[33,3.0,60]]],["HawkFeathers","Hawk Feathers","Перья ястреба","S",15,0.1,[[44,2.0,0],[27,2.0,60],[32,4.0,60],[5,4.0,60]]],["HawkBeak","Hawk Beak","Клюв ястреба","S",15,0.25,[[0,5.0,0],[3,3.0,60],[11,4.0,300],[33,3.0,60]]],["DragonflyBlue","Blue Dartwing","Синяя стрекоза","S",1,0.1,[[33,3.0,60],[46,4.0,60],[39,5.0,0],[13,1.0,30]]],["FireflyThorax","Torchbug Thorax","Торакс светлячка","S",1,0.1,[[0,5.0,0],[47,1.0,10],[18,2.0,30],[37,4.0,60]]],["Mushroom06","Blisterwort","Лютый гриб","S",12,0.2,[[12,3.0,0],[48,1.0,10],[39,3.0,0],[41,4.0,30]]],["Mushroom05","Namira's Rot","Гниль Намиры","S",0,0.25,[[38,3.0,0],[45,2.0,30],[13,1.0,30],[49,5.0,300]]],["Mushroom04","Imp Stool","Бесовский гриб","S",0,0.3,[[8,2.0,1],[21,1.0,10],[16,0.0,1],[39,3.0,0]]],["Mushroom03","White Cap","Белянка","S",0,0.3,[[4,3.0,30],[40,2.0,60],[17,5.0,0],[50,2.0,10]]],["Mushroom02","Bleeding Crown","Кровавый венец","S",10,0.3,[[23,3.0,30],[26,4.0,60],[6,2.0,30],[25,1.0,60]]],["Mushroom01","Fly Amanita","Мухомор","S",2,0.1,[[34,3.0,60],[51,4.0,60],[48,1.0,10],[22,5.0,300]]],["DBJarrinRoot","Jarrin Root","Корень жарницы","S",10,0.5,[[8,200.0,1],[38,3.0,0],[12,3.0,0],[43,100.0,5]]],["DragonflyOrange","Orange Dartwing","Оранжевая стрекоза","S",1,0.1,[[0,5.0,0],[50,2.0,10],[46,4.0,60],[21,1.0,10]]],["CreepClusterRoot","Creep Cluster","Ползучая лоза","S",1,0.2,[[17,5.0,0],[1,100.0,5],[11,4.0,300],[18,2.0,30]]],["HumanHeart","Human Heart","Человеческое сердце","S",0,1.0,[[8,2.0,1],[38,3.0,0],[43,100.0,5],[48,1.0,10]]],["SpiderEgg","Spider Egg","Паучье яйцо","S",5,0.2,[[12,3.0,0],[43,100.0,5],[45,2.0,30],[52,4.0,60]]],["JazBay","Jazbay Grapes","Виноград джазби","S",1,0.2,[[18,2.0,30],[14,4.0,60],[20,5.0,300],[2,2.0,10]]],["DragonsTongue","Dragon's Tongue","Язык дракона","S",5,0.1,[[34,3.0,60],[53,1.0,30],[19,1.0,60],[51,4.0,60]]],["SpikyGrass01","Grass Pod","Травяной стручок","S",1,0.1,[[30,4.0,60],[50,2.0,10],[9,4.0,60],[17,5.0,0]]],["GlowingMushroom","Glowing Mushroom","Светящийся гриб","S",5,0.2,[[33,3.0,60],[31,5.0,60],[41,4.0,30],[42,4.0,60]]],["NordicBarnacles","Nordic Barnacle","Морской желудь","S",5,0.2,[[38,3.0,0],[15,0.0,5],[49,5.0,300],[46,4.0,60]]],["BirdEgg01","Rock Warbler Egg","Яйцо оригмы","S",2,0.5,[[39,5.0,0],[32,4.0,60],[12,3.0,0],[18,2.0,30]]],["SlaughterfishEgg01","Slaughterfish Egg","Икра рыбы-убийцы","S",3,0.2,[[30,4.0,60],[46,4.0,60],[21,1.0,10],[37,4.0,60]]],["GiantLichen","Giant Lichen","Гигантский лишайник","S",5,0.25,[[29,3.0,30],[2,2.0,10],[6,2.0,30],[17,5.0,0]]],["SwampFungalPod01","Swamp Fungal Pod","Болотный стручок","S",5,0.25,[[33,3.0,60],[47,1.0,10],[16,0.0,1],[39,5.0,0]]],["MountainFlower01Purple","Purple Mountain Flower","Лиловый горноцвет","S",2,0.1,[[0,5.0,0],[5,4.0,60],[47,1.0,10],[3,3.0,60]]],["MountainFlower01Red","Red Mountain Flower","Красный горноцвет","S",2,0.1,[[17,5.0,0],[50,2.0,10],[14,4.0,60],[8,2.0,1]]],["MountainFlower01Blue","Blue Mountain Flower","Голубой горноцвет","S",2,0.1,[[39,5.0,0],[35,5.0,60],[42,4.0,60],[43,100.0,5]]],["MothWingMonarch","Butterfly Wing","Крыло монарха","S",3,0.1,[[39,5.0,0],[53,1.0,30],[36,1.0,10],[38,3.0,0]]],["MothWingLuna","Luna Moth Wing","Крыло лунного мотылька","S",5,0.1,[[38,3.0,0],[27,2.0,60],[49,5.0,300],[24,0.0,4]]],["MothWingBlue","Blue Butterfly Wing","Крыло синей бабочки","S",2,0.1,[[12,3.0,0],[35,5.0,60],[43,100.0,5],[54,1.0,30]]],["HagravenClaw","Hagraven Claw","Коготь ворожеи","S",20,0.25,[[25,1.0,60],[47,1.0,10],[54,1.0,30],[53,1.0,30]]],["CanisRoot01","Canis Root","Собачий корень","S",5,0.1,[[12,3.0,0],[32,4.0,60],[52,4.0,60],[16,0.0,1]]],["deathBell","Deathbell","Ядовитый колокольчик","S",4,0.1,[[8,3.0,1],[28,2.0,20],[10,50.0,5],[6,2.0,30]]],["ScalyPholiotaBits","Scaly Pholiota","Чешуйчатка","S",4,0.25,[[18,2.0,30],[19,4.0,60],[22,5.0,300],[11,4.0,300]]],["SprigganSap","Spriggan Sap","Живица сприггана","S",15,0.2,[[43,100.0,5],[54,1.0,30],[41,4.0,30],[9,4.0,60]]],["Nirnroot","Nirnroot","Корень Нирна","S",10,0.2,[[8,2.0,0],[12,3.0,0],[24,0.0,4],[25,1.0,60]]],["HangingMoss","Hanging Moss","Бородатый мох","S",1,0.25,[[38,3.0,0],[42,4.0,60],[43,100.0,5],[32,4.0,60]]],["CharredSkeeverHide","Charred Skeever Hide","Жареная злокрысья кожа","S",1,0.5,[[0,5.0,0],[44,2.0,0],[30,4.0,60],[39,5.0,0]]],["JuniperBerries","Juniper Berries","Ягоды можжевельника","S",1,0.1,[[23,3.0,30],[52,4.0,60],[49,5.0,300],[1,100.0,5]]],["Wheat","Wheat","Пшеница","S",5,0.1,[[39,5.0,0],[42,4.0,60],[1,100.0,5],[47,1.0,10]]],["Lavender","Lavender","Лаванда","S",1,0.1,[[25,1.0,60],[37,4.0,60],[50,2.0,10],[35,4.0,60]]],["TundraCotton","Tundra Cotton","Пушица","S",1,0.1,[[25,1.0,60],[14,4.0,60],[26,4.0,60],[53,1.0,30]]],["vampireDust","Vampire Dust","Прах вампира","S",25,0.2,[[24,0.0,4],[17,5.0,0],[49,5.0,300],[44,5.0,0]]],["glowDust","Glow Dust","Светящаяся пыль","S",20,0.5,[[38,3.0,0],[43,100.0,5],[31,5.0,60],[33,3.0,60]]],["TrollFat","Troll Fat","Жир тролля","S",15,1.0,[[30,4.0,60],[51,4.0,60],[48,1.0,10],[8,2.0,1]]],["Taproot","Taproot","Стержневой корень","S",15,0.5,[[18,2.0,30],[19,4.0,60],[20,5.0,300],[17,5.0,0]]],["SlaughterfishScales","Slaughterfish Scales","Чешуя рыбы-убийцы","S",3,0.1,[[3,3.0,60],[21,1.0,10],[40,2.0,60],[26,4.0,60]]],["SkeeverTail","Skeever Tail","Хвост злокрыса","S",3,0.2,[[1,100.0,5],[2,2.0,10],[8,2.0,1],[27,2.0,60]]],["IceWraithTeeth","Ice Wraith Teeth","Зубы ледяного привидения","S",30,0.25,[[4,3.0,30],[40,2.0,60],[24,0.0,4],[23,3.0,30]]],["HagravenFeathers","Hagraven Feathers","Перья ворожеи","S",20,0.1,[[38,3.0,0],[35,5.0,60],[48,1.0,10],[29,3.0,30]]],["GiantToes","Giant's Toe","Палец великана","S",20,1.0,[[12,3.0,0],[42,4.0,300],[11,4.0,300],[1,100.0,5]]],["Ectoplasm","Ectoplasm","Эктоплазма","S",25,0.1,[[17,5.0,0],[31,4.0,60],[14,4.0,60],[8,2.0,1]]],["BriarHeart","Briar Heart","Вересковое сердце","S",20,0.5,[[17,5.0,0],[26,2.0,60],[16,0.0,1],[14,4.0,60]]],["VoidSalts","Void Salts","Соль пустоты","S",125,0.2,[[29,3.0,30],[25,1.0,60],[8,2.0,1],[14,4.0,60]]],["FrostSalts","Frost Salts","Морозная соль","S",100,0.25,[[23,3.0,30],[3,3.0,60],[17,5.0,0],[35,5.0,60]]],["FireSalts","Fire Salts","Огненная соль","S",50,0.25,[[4,3.0,30],[34,3.0,60],[17,5.0,0],[20,5.0,300]]],["FalmerEar","Falmer Ear","Ухо фалмера","S",10,0.2,[[8,2.0,1],[48,1.0,10],[30,4.0,60],[45,2.0,30]]],["DaedraHeart","Daedra Heart","Сердце даэдра","S",250,0.5,[[39,5.0,0],[1,100.0,5],[38,3.0,0],[13,1.0,30]]],["ChaurusEggs","Chaurus Eggs","Яйцо коруса","S",10,0.2,[[6,2.0,30],[37,4.0,60],[38,3.0,0],[24,0.0,4]]],["FrostMirriam","Frost Mirriam","Морозная мириам","S",1,0.1,[[3,3.0,60],[5,4.0,60],[50,2.0,10],[1,100.0,5]]],["ElvesEar","Elves Ear","Эльфийское ухо","S",10,0.1,[[17,5.0,0],[52,4.0,60],[4,2.0,30],[34,3.0,30]]],["Garlic","Garlic","Чеснок","S",1,0.25,[[30,4.0,60],[37,4.0,60],[20,5.0,300],[49,5.0,300]]],["SaltPile","Salt Pile","Соль","S",2,0.2,[[18,2.0,30],[7,4.0,60],[10,50.0,5],[20,5.0,300]]],["BoneMeal","Bone Meal","Костная мука","S",5,0.5,[[12,3.0,0],[34,3.0,60],[35,5.0,60],[28,2.0,10]]],["Nightshade","Nightshade","Паслен","S",8,0.1,[[8,2.0,1],[43,100.0,5],[36,1.0,10],[31,4.0,60]]],["Snowberry","Snowberries","Снежные ягоды","S",4,0.1,[[34,3.0,60],[54,1.0,30],[3,3.0,60],[33,3.0,60]]],["Thistle01","Thistle Branch","Ветка чертополоха","S",1,0.1,[[3,3.0,60],[28,2.0,10],[30,3.0,0],[40,2.0,60]]],["ccBGS_RootThornHookIngredient","Thorn Hook","Шип","S",20,0.1,[[21,1.0,10],[16,0.0,1],[20,3.0,180],[49,3.0,180]]],["ccBGS_RootScreamingMawIngredient","Screaming Maw","Кричалка","S",20,0.1,[[20,20.0,60],[9,5.0,60],[24,0.0,1],[49,20.0,10]]],["ccBGS_RootRotScaleIngredient","Rot Scale","Гнилая чешуйка","S",20,0.1,[[10,5.0,30],[21,1.0,30],[13,1.0,5],[16,0.0,1]]],["DLC1MountainFlower01Yellow","Yellow Mountain Flower","Желтый горноцвет","DG",2,0.1,[[30,4.0,60],[7,5.0,60],[42,4.0,60],[1,100.0,5]]],["DLC01PoisonBloom","Poison Bloom","Ядовитый цветок","DG",5,0.25,[[8,3.0,1],[10,50.0,5],[11,4.0,300],[13,1.0,30]]],["DLC01ChaurusHunterAntennae","Chaurus Hunter Antennae","Усик коруса-охотника","DG",2,0.1,[[12,3.0,0],[35,5.0,60],[43,100.0,5],[54,1.0,30]]],["DLC01GlowPlant01Ingredient","Gleamblossom","Светящийся цветок","DG",5,0.1,[[25,1.0,60],[13,1.0,30],[49,5.0,300],[16,0.0,1]]],["DLC01MothWingAncestor","Ancestor Moth Wing","Крыло мотылька предка","DG",2,0.1,[[12,3.0,0],[35,5.0,60],[43,100.0,5],[54,1.0,30]]],["BYOHHawkEgg01","Hawk's Egg","Яйцо ястреба","HF",5,0.5,[[25,1.0,60],[43,100.0,5],[15,0.0,5],[36,1.0,10]]],["BYOHSalmonRoe01","Salmon Roe","Лососевая икра","HF",5,0.2,[[0,2.0,0],[15,0.0,60],[14,50.0,5],[20,5.0,300]]],["DLC2TernFeathers","Felsaad Tern Feathers","Перья фельсадской крачки","DB",15,0.1,[[39,1.0,0],[27,2.0,60],[44,5.0,0],[25,1.0,60]]],["DLC2HangingMoss","Emperor Parasol Moss","Императорский зонтичный мох","DB",1,0.25,[[8,3.0,0],[14,4.0,60],[49,5.0,300],[51,4.0,60]]],["DLC2AshCreepCluster","Ash Creep Cluster","Пепельная ползучая лоза","DB",20,0.25,[[12,3.0,0],[24,0.0,4],[34,3.0,60],[31,5.0,60]]],["DLC2NetchJelly","Netch Jelly","Желе нетча","DB",20,0.5,[[16,0.0,1],[11,4.0,300],[0,10.0,0],[13,1.0,30]]],["DLC2AshHopperJelly","Ash Hopper Jelly","Желе пепельного прыгуна","DB",20,0.25,[[39,5.0,0],[27,2.0,60],[33,3.0,60],[4,3.0,30]]],["DLC2BoarTusk","Boar Tusk","Кабаний клык","DB",20,0.5,[[37,5.0,300],[42,4.0,300],[26,4.0,60],[48,1.0,10]]],["DLC2BurntSprigganWood","Burnt Spriggan Wood","Древесина горелого сприггана","DB",20,0.5,[[23,3.0,30],[9,4.0,60],[43,100.0,5],[10,50.0,5]]],["DLC2GhoulAsh","Spawn Ash","Пепел порождения","DB",20,0.1,[[28,2.0,10],[34,3.0,60],[54,1.0,30],[50,2.0,10]]],["DLC2Scathecraw01","Scathecraw","Вредозобник","DB",1,0.1,[[2,2.0,10],[28,2.0,10],[50,2.0,10],[21,1.0,10]]],["DLC2TramaRoot01","Trama Root","Корень трамы","DB",1,0.2,[[29,3.0,30],[11,4.0,300],[38,3.0,0],[10,50.0,5]]],["DLC2SpikyGrassAsh01","Ashen Grass Pod","Стручок пепельной травы","DB",1,0.1,[[34,4.0,60],[29,3.0,30],[45,2.0,30],[5,4.0,60]]],["ccBGSSSE001_AngelfishIng","Angelfish","Рыба-ангел","FISH",30,0.25,[[49,5.0,300],[34,3.0,60],[52,4.0,60],[15,0.0,5]]],["ccBGSSSE001_AnglerLarvaeIng","Angler Larvae","Малек удильщика","FISH",1,0.25,[[21,1.0,10],[22,5.0,300],[15,0.0,5],[51,4.0,60]]],["ccBGSSSE001_PearlfishIng","Pearlfish","Карапус","FISH",15,0.25,[[0,5.0,0],[3,3.0,60],[41,4.0,30],[32,4.0,60]]],["ccBGSSSE001_PinnateSpadefishIng","Spadefish","Рыба-лопата","FISH",15,0.25,[[39,5.0,0],[45,2.0,30],[46,4.0,60],[44,5.0,0]]],["ccBGSSSE001_GlassfishIng","Glassfish","Стеклянный окунь","FISH",1,0.25,[[17,5.0,0],[24,0.0,4],[19,1.0,60],[55,1.0,30]]],["ccBGSSSE001_PygmySunfishIng","Pygmy Sunfish","Карликовый солнечник","FISH",2,0.25,[[0,5.0,0],[47,1.0,10],[43,100.0,5],[7,4.0,60]]],["ccBGSSSE001_JuvenileMudcrabIng","Juvenile Mudcrab","Молодой грязевой краб","FISH",10,0.25,[[22,5.0,300],[11,4.0,300],[44,5.0,0],[51,4.0,60]]],["ccBGSSSE001_LyretailAnthiasIng","Lyretail Anthias","Лирохвостый окунь","FISH",30,0.25,[[17,5.0,0],[9,4.0,60],[35,5.0,60],[11,4.0,300]]],["ccBGSSSE001_GoldfishIng","Goldfish","Золотая рыбка","FISH",10,0.25,[[0,5.0,0],[40,2.0,60],[15,0.0,5],[3,3.0,60]]],["ccBGSSSE025_PurpleButterfly","Purple Butterfly Wing","Крыло фиолетовой бабочки","SS",2,0.1,[[49,5.0,300],[20,5.0,300],[22,5.0,300],[16,0.0,1]]],["ccBGSSSE025_Blissbug","Bliss Bug Thorax","Торакс жука из Блисса","SS",1,0.1,[[23,3.0,30],[34,3.0,60],[40,2.0,60],[19,1.0,60]]],["ccBGSSSE025_GreenButterfly","Green Butterfly Wing","Крыло зеленой бабочки","SS",2,0.1,[[17,5.0,0],[13,1.0,30],[10,5.0,30],[24,0.0,4]]],["ccBGSSSE037_SloadSoap","Sload Soap","Мыло слоад","CUR",30,0.1,[[34,4.0,60],[13,2.0,30],[35,6.0,60],[9,5.0,60]]],["ccBGSSSE037_StoneflowerPetals","Stoneflower Petals","Лепестки каменевки","CUR",15,0.1,[[29,4.0,30],[32,5.0,60],[14,5.0,60],[54,2.0,30]]],["ccBGSSSE037_VoidEssence","Void Essence","Эссенция пустоты","CUR",60,0.2,[[39,6.0,0],[42,5.0,300],[37,5.0,300],[49,6.0,300]]],["ccBGSSSE037_WatchersEye","Watcher's Eye","Глаз дозорного","CUR",9,0.2,[[56,0.0,60],[14,5.0,60],[19,5.0,60],[57,50.0,60]]],["ccBGSSSE037_WatchersEyeBlind","Blind Watcher's Eye","Слепой глаз дозорного","CUR",9,0.2,[[58,0.0,60],[14,5.0,60],[9,5.0,60],[57,50.0,60]]],["ccBGSSSE037_WispStalkCaps","Wisp Stalk Caps","Шляпки гифоломы","CUR",20,0.1,[[8,3.0,1],[6,3.0,30],[48,1.0,20],[22,6.0,300]]],["ccBGSSSE037_WitheringMoon","Withering Moon","Усыхающая луна","CUR",5,0.1,[[17,6.0,0],[57,50.0,60],[27,3.0,60],[44,2.0,0]]],["ccBGSSSE037_WormsHeadCap","Worm's Head Cap","Шляпка головы червя","CUR",30,0.2,[[45,3.0,30],[56,0.0,60],[11,5.0,300],[10,50.0,10]]],["ccBGSSSE037_DaedrothTeeth","Daedroth Teeth","Зубы даэдрота","CUR",50,0.5,[[3,4.0,60],[58,0.0,60],[43,100.0,10],[22,6.0,300]]],["ccBGSSSE037_DreughWax","Dreugh Wax","Дреугский воск","CUR",25,1.0,[[18,3.0,30],[48,1.0,20],[54,2.0,30],[41,5.0,30]]],["ccBGSSSE037_ElytraIchor","Elytra Ichor","Ихор элитры","CUR",30,0.1,[[17,6.0,0],[24,0.0,6],[10,50.0,10],[13,2.0,30]]],["ccBGSSSE037_FirePetal","Fire Petal","Огненный лепесток","CUR",30,0.1,[[8,3.0,1],[34,4.0,60],[57,50.0,60],[16,0.0,2]]],["ccBGSSSE037_FlameStalk","Flame Stalk","Огненный гриб","CUR+SS",25,0.1,[[39,6.0,0],[3,4.0,60],[23,4.0,30],[24,0.0,6]]],["ccBGSSSE037_FungusStalk","Fungus Stalk","Грибная трава","CUR",30,0.1,[[17,6.0,0],[42,5.0,300],[37,5.0,300],[15,0.0,8]]],["ccBGSSSE037_AsterBloomCore","Aster Bloom Core","Цветок астры","CUR",40,0.1,[[25,2.0,60],[27,4.0,60],[26,5.0,60],[16,0.0,2]]],["ccBGSSSE037_BlisterPodCap","Blister Pod Cap","Шляпка волдырника","CUR",25,0.1,[[17,6.0,0],[14,5.0,60],[56,0.0,60],[24,0.0,6]]],["ccBGSSSE037_BittergreenPetals","Bittergreen Petals","Лепестки горьколистника","CUR",25,0.1,[[36,2.0,10],[24,0.0,6],[59,2.0,0],[38,4.0,0]]],["ccBGSSSE037_BogBeacon","Bog Beacon","Болотная митрула","CUR",20,0.1,[[17,6.0,0],[40,3.0,60],[13,2.0,30],[12,4.0,0]]],["ccBGSSSE037_AlocasiaFruit","Alocasia Fruit","Плод алоказии","CUR",22,0.25,[[22,6.0,300],[58,0.0,60],[50,3.0,10],[49,6.0,300]]],["ccBGSSSE037_HackleLoLeaf","Hackle-Lo Leaf","Лист хакльлоу","CUR",30,0.1,[[0,6.0,0],[16,0.0,2],[15,0.0,8],[7,5.0,60]]],["ccBGSSSE037_GoldKanet","Gold Kanet","Золотой канет","CUR",30,0.1,[[16,0.0,2],[2,3.0,20],[4,4.0,30],[41,5.0,30]]],["ccBGSSSE037_BunglersBane","Bungler's Bane","Банглер бейн","CUR",50,0.5,[[10,50.0,10],[28,3.0,20],[1,100.0,10],[25,2.0,60]]],["ccBGSSSE037_Chokeweed","Chokeweed","Удушайка","CUR",7,0.1,[[4,4.0,30],[0,6.0,0],[44,2.0,0],[38,4.0,0]]],["ccBGSSSE037_Chokeberry","Chokeberry","Арония","CUR",15,0.1,[[8,3.0,1],[2,3.0,20],[21,2.0,10],[6,3.0,30]]],["ccBGSSSE037_Lichor","Lichor","Лихор","CUR",15,0.1,[[17,6.0,0],[20,6.0,300],[14,5.0,60],[57,50.0,60]]],["ccBGSSSE037_Ambrosia","Ambrosia","Амброзия","CUR",15,0.1,[[39,6.0,0],[49,6.0,300],[42,5.0,60],[59,3.0,0]]],["ccBGSSSE037_CodaFlower","Coda Flower","Цветок коды","CUR",30,0.1,[[8,3.0,1],[36,2.0,10],[50,3.0,10],[11,5.0,300]]],["ccBGSSSE037_Comberry","Comberry","Комуника","CUR",12,0.1,[[12,4.0,0],[57,50.0,60],[17,6.0,0],[31,6.0,60]]],["ccBGSSSE037_CongealedPutrescence","Congealed Putrescence","Затвердевшая гниль","CUR",9,0.1,[[2,3.0,20],[17,6.0,0],[23,4.0,30],[35,6.0,60]]],["ccBGSSSE037_GnarlBark","Gnarl Bark","Кора гнарла","CUR",15,0.1,[[8,3.0,1],[49,6.0,300],[40,3.0,60],[34,4.0,60]]],["ccBGSSSE037_CorkbulbRoot","Corkbulb Root","Корень пробочника","CUR",30,0.1,[[16,0.0,2],[39,6.0,0],[33,4.0,60],[52,5.0,60]]],["ccBGSSSE037_DaedraSilk","Daedra Silk","Шелк даэдра","CUR",50,0.5,[[36,2.0,10],[16,0.0,2],[56,0.0,60],[24,0.0,6]]],["ccBGSSSE037_DaedraVenin","Daedra Venin","Яд даэдра","CUR",50,0.2,[[2,3.0,20],[16,0.0,2],[31,6.0,60],[57,50.0,60]]],["ccBGSSSE037_HungerTongue","Hunger Tongue","Язык алчущего","CUR",10,0.1,[[23,4.0,60],[44,2.0,0],[59,2.0,0],[14,5.0,60]]],["ccBGSSSE037_HydnumAzureGiantSpore","Hydnum Azure Giant Spore","Гигантская спора ежовика лазурного","CUR",30,0.5,[[3,4.0,60],[42,5.0,300],[49,6.0,300],[58,0.0,60]]],["ccBGSSSE037_HyphaFacia","Hypha Facia","Гайфа фация","CUR",23,0.1,[[6,3.0,30],[48,1.0,20],[28,3.0,20],[25,2.0,60]]],["ccBGSSSE037_ImpGall","Imp Gall","Желчь беса","CUR",15,0.2,[[8,3.0,1],[23,4.0,30],[53,2.0,30],[59,2.0,0]]],["ccBGSSSE037_KagoutiHide","Kagouti Hide","Шкура кагути","CUR",20,1.0,[[36,2.0,10],[56,0.0,60],[11,5.0,300],[33,4.0,60]]],["ccBGSSSE037_KreshFiber","Kresh Fiber","Волокно креша","CUR",30,0.1,[[18,3.0,30],[10,50.0,10],[5,5.0,60],[46,5.0,60]]],["ccBGSSSE037_HeartofOrderIngredient","Heart of Order","Сердце Порядка","CUR",40,0.1,[[39,6.0,0],[42,5.0,300],[32,5.0,60],[51,5.0,60]]],["ccBGSSSE037_LuminousRussula","Luminous Russula","Светящаяся сыроежка","CUR",25,0.2,[[36,2.0,10],[21,2.0,10],[15,0.0,8],[13,2.0,30]]],["ccBGSSSE037_Marshmerrow","Marshmerrow","Болотный тростник","CUR",18,0.1,[[39,6.0,0],[11,5.0,300],[18,3.0,30],[12,4.0,0]]],["ccBGSSSE037_MinotaurHorn","Minotaur Horn","Рог минотавра","CUR",55,5.0,[[30,5.0,60],[43,100.0,10],[49,6.0,300],[20,6.0,300]]],["ccBGSSSE037_OgresTeeth","Ogre's Teeth","Зубы огра","CUR",50,3.0,[[29,4.0,30],[30,5.0,60],[47,2.0,10],[49,6.0,300]]],["ccBGSSSE037_RedKelpGasBladder","Red Kelp Gas Bladder","Газовый пузырь красной водоросли","CUR",20,0.1,[[22,6.0,300],[15,0.0,8],[44,2.0,0],[14,5.0,60]]],["ccBGSSSE037_Roobrush","Roobrush","Рубраш","CUR",20,0.1,[[18,3.0,30],[5,5.0,60],[21,2.0,10],[59,2.0,0]]],["ccBGSSSE037_Redwort","Redwort Flower","Цветок редворта","CUR",25,0.1,[[3,4.0,60],[59,2.0,0],[8,3.0,1],[24,0.0,6]]],["ccBGSSSE037_ScalonFin","Scalon Fin","Плавник скейлона","CUR",25,0.1,[[15,0.0,8],[8,3.0,1],[47,2.0,10],[43,100.0,10]]],["ccBGSSSE037_Saltrice","Saltrice","Соленый рис","CUR",6,0.1,[[0,6.0,0],[14,5.0,60],[1,100.0,10],[39,6.0,0]]],["ccBGSSSE037_ScribJelly","Scrib Jelly","Скрибовое желе","CUR",20,0.1,[[20,6.0,300],[59,2.0,0],[44,2.0,0],[22,6.0,300]]],["ccBGSSSE037_ScribJerky","Scrib Jerky","Вяленая скрибятина","CUR",15,0.2,[[0,6.0,0],[37,5.0,300],[16,0.0,2],[15,0.0,8]]]]};
+const FIDMAP={"CritterPondFish01Ingredient":["Skyrim.esm",1076764],"CritterPondFish02Ingredient":["Skyrim.esm",1076763],"CritterPondFish03Ingredient":["Skyrim.esm",1076762],"CritterPondFish04Ingredient":["Skyrim.esm",1076761],"CritterPondFish05Ingredient":["Skyrim.esm",1076760],"HumanFlesh":["Skyrim.esm",1054387],"DwarvenOil":["Skyrim.esm",987584],"MoraTapinellaBits":["Skyrim.esm",968816],"MoonSugar":["Skyrim.esm",888383],"NirnrootRed":["Skyrim.esm",749594],"BeeHoneyComb":["Skyrim.esm",723141],"CritterBeeIngredient":["Skyrim.esm",692629],"BeeHiveHusk":["Skyrim.esm",692625],"PearlSmall":["Skyrim.esm",546048],"Pearl":["Skyrim.esm",546046],"FavorThadgeirAshes":["Skyrim.esm",460215],"PowderedMammothTusk":["Skyrim.esm",441360],"WispWrappings":["Skyrim.esm",441358],"AntlersSmall":["Skyrim.esm",441355],"AntlersLarge":["Skyrim.esm",441354],"SabrecatEyeball":["Skyrim.esm",441351],"SabrecatTooth":["Skyrim.esm",441348],"BearClaws":["Skyrim.esm",441346],"MudcrabChitin":["Skyrim.esm",441344],"BirdEgg03":["Skyrim.esm",146807],"BirdEgg02":["Skyrim.esm",146799],"HawkFeathers":["Skyrim.esm",949968],"HawkBeak":["Skyrim.esm",949948],"DragonflyBlue":["Skyrim.esm",937740],"FireflyThorax":["Skyrim.esm",318067],"Mushroom06":["Skyrim.esm",317989],"Mushroom05":["Skyrim.esm",317988],"Mushroom04":["Skyrim.esm",317987],"Mushroom03":["Skyrim.esm",317986],"Mushroom02":["Skyrim.esm",317984],"Mushroom01":["Skyrim.esm",317952],"DBJarrinRoot":["Skyrim.esm",113852],"DragonflyOrange":["Skyrim.esm",768342],"CreepClusterRoot":["Skyrim.esm",729475],"HumanHeart":["Skyrim.esm",727245],"SpiderEgg":["Skyrim.esm",595227],"JazBay":["Skyrim.esm",437322],"DragonsTongue":["Skyrim.esm",559522],"SpikyGrass01":["Skyrim.esm",540260],"GlowingMushroom":["Skyrim.esm",519681],"NordicBarnacles":["Skyrim.esm",519669],"BirdEgg01":["Skyrim.esm",518344],"SlaughterfishEgg01":["Skyrim.esm",518341],"GiantLichen":["Skyrim.esm",518337],"SwampFungalPod01":["Skyrim.esm",518327],"MountainFlower01Purple":["Skyrim.esm",491038],"MountainFlower01Red":["Skyrim.esm",491037],"MountainFlower01Blue":["Skyrim.esm",491036],"MothWingMonarch":["Skyrim.esm",468960],"MothWingLuna":["Skyrim.esm",468959],"MothWingBlue":["Skyrim.esm",468958],"HagravenClaw":["Skyrim.esm",439945],"CanisRoot01":["Skyrim.esm",437195],"deathBell":["Skyrim.esm",333512],"ScalyPholiotaBits":["Skyrim.esm",457040],"SprigganSap":["Skyrim.esm",408415],"Nirnroot":["Skyrim.esm",367494],"HangingMoss":["Skyrim.esm",360337],"CharredSkeeverHide":["Skyrim.esm",337557],"JuniperBerries":["Skyrim.esm",329582],"Wheat":["Skyrim.esm",307386],"Lavender":["Skyrim.esm",285736],"TundraCotton":["Skyrim.esm",260088],"vampireDust":["Skyrim.esm",241014],"glowDust":["Skyrim.esm",241011],"TrollFat":["Skyrim.esm",241010],"Taproot":["Skyrim.esm",241009],"SlaughterfishScales":["Skyrim.esm",241008],"SkeeverTail":["Skyrim.esm",241007],"IceWraithTeeth":["Skyrim.esm",241002],"HagravenFeathers":["Skyrim.esm",240998],"GiantToes":["Skyrim.esm",240996],"Ectoplasm":["Skyrim.esm",240995],"BriarHeart":["Skyrim.esm",240993],"VoidSalts":["Skyrim.esm",240992],"FrostSalts":["Skyrim.esm",240991],"FireSalts":["Skyrim.esm",240990],"FalmerEar":["Skyrim.esm",240989],"DaedraHeart":["Skyrim.esm",240987],"ChaurusEggs":["Skyrim.esm",240982],"FrostMirriam":["Skyrim.esm",216370],"ElvesEar":["Skyrim.esm",216369],"Garlic":["Skyrim.esm",216354],"SaltPile":["Skyrim.esm",216287],"BoneMeal":["Skyrim.esm",216285],"Nightshade":["Skyrim.esm",193612],"Snowberry":["Skyrim.esm",111549],"Thistle01":["Skyrim.esm",79018],"ccBGS_RootThornHookIngredient":["Update.esm",12399],"ccBGS_RootScreamingMawIngredient":["Update.esm",12398],"ccBGS_RootRotScaleIngredient":["Update.esm",12397],"DLC1MountainFlower01Yellow":["Dawnguard.esm",10872],"DLC01PoisonBloom":["Dawnguard.esm",99835],"DLC01ChaurusHunterAntennae":["Dawnguard.esm",99255],"DLC01GlowPlant01Ingredient":["Dawnguard.esm",45207],"DLC01MothWingAncestor":["Dawnguard.esm",22970],"BYOHHawkEgg01":["HearthFires.esm",61900],"BYOHSalmonRoe01":["HearthFires.esm",13637],"DLC2TernFeathers":["Dragonborn.esm",249230],"DLC2HangingMoss":["Dragonborn.esm",130933],"DLC2AshCreepCluster":["Dragonborn.esm",118132],"DLC2NetchJelly":["Dragonborn.esm",118130],"DLC2AshHopperJelly":["Dragonborn.esm",118129],"DLC2BoarTusk":["Dragonborn.esm",118127],"DLC2BurntSprigganWood":["Dragonborn.esm",118126],"DLC2GhoulAsh":["Dragonborn.esm",118125],"DLC2Scathecraw01":["Dragonborn.esm",97943],"DLC2TramaRoot01":["Dragonborn.esm",94216],"DLC2SpikyGrassAsh01":["Dragonborn.esm",93734],"ccBGSSSE001_AngelfishIng":["ccBGSSSE001-Fish.esm",2283],"ccBGSSSE001_AnglerLarvaeIng":["ccBGSSSE001-Fish.esm",2288],"ccBGSSSE001_PearlfishIng":["ccBGSSSE001-Fish.esm",2284],"ccBGSSSE001_PinnateSpadefishIng":["ccBGSSSE001-Fish.esm",2291],"ccBGSSSE001_GlassfishIng":["ccBGSSSE001-Fish.esm",2286],"ccBGSSSE001_PygmySunfishIng":["ccBGSSSE001-Fish.esm",2285],"ccBGSSSE001_JuvenileMudcrabIng":["ccBGSSSE001-Fish.esm",2290],"ccBGSSSE001_LyretailAnthiasIng":["ccBGSSSE001-Fish.esm",2289],"ccBGSSSE001_GoldfishIng":["ccBGSSSE001-Fish.esm",2287],"ccBGSSSE025_PurpleButterfly":["ccBGSSSE025-AdvDSGS.esm",364883],"ccBGSSSE025_Blissbug":["ccBGSSSE025-AdvDSGS.esm",364885],"ccBGSSSE025_FlameStalk":["ccBGSSSE025-AdvDSGS.esm",613923,"ccBGSSSE037_FlameStalk"],"ccBGSSSE025_GreenButterfly":["ccBGSSSE025-AdvDSGS.esm",364881],"ccBGSSSE037_SloadSoap":["ccBGSSSE037-Curios.esl",2078],"ccBGSSSE037_StoneflowerPetals":["ccBGSSSE037-Curios.esl",2079],"ccBGSSSE037_VoidEssence":["ccBGSSSE037-Curios.esl",2080],"ccBGSSSE037_WatchersEye":["ccBGSSSE037-Curios.esl",2081],"ccBGSSSE037_WatchersEyeBlind":["ccBGSSSE037-Curios.esl",2082],"ccBGSSSE037_WispStalkCaps":["ccBGSSSE037-Curios.esl",2083],"ccBGSSSE037_WitheringMoon":["ccBGSSSE037-Curios.esl",2084],"ccBGSSSE037_WormsHeadCap":["ccBGSSSE037-Curios.esl",2085],"ccBGSSSE037_DaedrothTeeth":["ccBGSSSE037-Curios.esl",2086],"ccBGSSSE037_DreughWax":["ccBGSSSE037-Curios.esl",2087],"ccBGSSSE037_ElytraIchor":["ccBGSSSE037-Curios.esl",2088],"ccBGSSSE037_FirePetal":["ccBGSSSE037-Curios.esl",2089],"ccBGSSSE037_FlameStalk":["ccBGSSSE037-Curios.esl",2090],"ccBGSSSE037_FungusStalk":["ccBGSSSE037-Curios.esl",2091],"ccBGSSSE037_AsterBloomCore":["ccBGSSSE037-Curios.esl",3430],"ccBGSSSE037_BlisterPodCap":["ccBGSSSE037-Curios.esl",3434],"ccBGSSSE037_BittergreenPetals":["ccBGSSSE037-Curios.esl",3432],"ccBGSSSE037_BogBeacon":["ccBGSSSE037-Curios.esl",3436],"ccBGSSSE037_AlocasiaFruit":["ccBGSSSE037-Curios.esl",3426],"ccBGSSSE037_HackleLoLeaf":["ccBGSSSE037-Curios.esl",2094],"ccBGSSSE037_GoldKanet":["ccBGSSSE037-Curios.esl",2093],"ccBGSSSE037_BunglersBane":["ccBGSSSE037-Curios.esl",2050],"ccBGSSSE037_Chokeweed":["ccBGSSSE037-Curios.esl",2052],"ccBGSSSE037_Chokeberry":["ccBGSSSE037-Curios.esl",2104],"ccBGSSSE037_Lichor":["ccBGSSSE037-Curios.esl",2103],"ccBGSSSE037_Ambrosia":["ccBGSSSE037-Curios.esl",2102],"ccBGSSSE037_CodaFlower":["ccBGSSSE037-Curios.esl",2053],"ccBGSSSE037_Comberry":["ccBGSSSE037-Curios.esl",2054],"ccBGSSSE037_CongealedPutrescence":["ccBGSSSE037-Curios.esl",2055],"ccBGSSSE037_GnarlBark":["ccBGSSSE037-Curios.esl",2092],"ccBGSSSE037_CorkbulbRoot":["ccBGSSSE037-Curios.esl",2057],"ccBGSSSE037_DaedraSilk":["ccBGSSSE037-Curios.esl",2058],"ccBGSSSE037_DaedraVenin":["ccBGSSSE037-Curios.esl",2059],"ccBGSSSE037_HungerTongue":["ccBGSSSE037-Curios.esl",2060],"ccBGSSSE037_HydnumAzureGiantSpore":["ccBGSSSE037-Curios.esl",2061],"ccBGSSSE037_HyphaFacia":["ccBGSSSE037-Curios.esl",2062],"ccBGSSSE037_ImpGall":["ccBGSSSE037-Curios.esl",2063],"ccBGSSSE037_KagoutiHide":["ccBGSSSE037-Curios.esl",2064],"ccBGSSSE037_KreshFiber":["ccBGSSSE037-Curios.esl",2065],"ccBGSSSE037_HeartofOrderIngredient":["ccBGSSSE037-Curios.esl",2129],"ccBGSSSE037_LuminousRussula":["ccBGSSSE037-Curios.esl",2067],"ccBGSSSE037_Marshmerrow":["ccBGSSSE037-Curios.esl",2068],"ccBGSSSE037_MinotaurHorn":["ccBGSSSE037-Curios.esl",2069],"ccBGSSSE037_OgresTeeth":["ccBGSSSE037-Curios.esl",2070],"ccBGSSSE037_RedKelpGasBladder":["ccBGSSSE037-Curios.esl",2071],"ccBGSSSE037_Roobrush":["ccBGSSSE037-Curios.esl",2073],"ccBGSSSE037_Redwort":["ccBGSSSE037-Curios.esl",2072],"ccBGSSSE037_ScalonFin":["ccBGSSSE037-Curios.esl",2075],"ccBGSSSE037_Saltrice":["ccBGSSSE037-Curios.esl",2074],"ccBGSSSE037_ScribJelly":["ccBGSSSE037-Curios.esl",2076],"ccBGSSSE037_ScribJerky":["ccBGSSSE037-Curios.esl",2077]};
+
+/* ---------- i18n ---------- */
+const ruPl=(n,one,few,many)=>{const a=n%10,b=n%100;return a===1&&b!==11?one:a>=2&&a<=4&&(b<12||b>14)?few:many};
+const enPl=(n,one,many)=>n===1?one:many;
+const T={
+en:{
+  sub:n=>`Skyrim SE / AE potion calculator · ${n} ingredients: base game, Dawnguard, Hearthfire, Dragonborn, Fishing, Rare Curios, Saints & Seducers`,
+  tabBrew:"What can I brew",tabFind:"Brew what I need",help:"How to use",close:"Close",
+  settings:"My alchemist",skill:"Alchemy skill",perk:"Alchemist perk",none:"none",phys:"Physician",bene:"Benefactor",pois:"Poisoner",pure:"Purity",fort:"Fortify Alchemy, %",
+  hint:S=>`skill ${S.skill}, Alchemist ${S.alch}/5${S.phys?", Physician":""}${S.bene?", Benefactor":""}${S.pois?", Poisoner":""}${S.pure?", Purity":""}${S.fort?`, +${S.fort}%`:""}`,
+  bag:"Ingredient bag",searchIng:"Name or effect…",gameLoad:"Update bag from game",gameFile:"Pick a save file",
+  gameHint:"Save in game, then press the button. The first time, pick the folder Documents → My Games → Skyrim Special Edition → Saves. You can also drop an .ess file onto the page.",
+  owned:"Only mine",clear:"Clear bag",sample:"The bag holds a sample set. Load your save, set your own counts, or clear the bag.",
+  brewH:"What you can brew",all:"All",potions:"Potions",poisons:"Poisons",noSide:"No side effects",brewSearch:"Filter by effect…",
+  sortValue:"Most valuable first",sortCount:"Most batches first",sortEff:"Most effects first",
+  findH:"What do you need",onlyMine:"Only my ingredients",clean:"No stronger extra effects",
+  note:"Strength and value follow the game's formulas, with your skill and perks. Each potion uses one of each ingredient. In the game an effect takes its strength from the ingredient where it's strongest, and the strongest effect decides whether you get a potion or a poison.",
+  disclaimer:"Unofficial fan tool, not affiliated with Bethesda.",
+  kinds:n=>`${n} ${enPl(n,"kind","kinds")} in bag`,less:"Less",more:"More",qty:"Count",
+  emptyOwned:"Your bag is empty. Load your save, or turn off “Only mine” and add ingredients with +.",nothing:"Nothing found.",
+  inBag:n=>`in bag ${n}`,notInBag:"not in bag",potion:"potion",poison:"poison",
+  title:(p,name)=>(p?"Poison: ":"Potion: ")+name,value:"value ≈",canBrew:n=>`you can brew <b class="num">${n}</b>`,lacking:"missing ingredients",
+  per1:p=>`For 1 ${p?"poison":"potion"}, put in the cauldron:`,
+  allN:(n,hl)=>`To brew all ${n}: ${n} of each.${hl?" Highlighted: the ingredient you have the least of.":""}`,
+  side:p=>p?"Side effect: a beneficial effect in a poison":"Side effect: a harmful effect in a potion",
+  need2:"Add at least two ingredients to the bag, and every potion they make will show up here.",
+  recipes:n=>`${n} ${enPl(n,"recipe","recipes")}`,showMore:n=>`Show more (${n})`,noFilter:"Nothing matches these filters.",
+  addEff:"Add an effect…",remove:"Remove",pickUp:"Pick up to three effects the potion should have.",
+  findEmpty:"For example, pick “Restore Health” to see the ingredients that have it and the best combinations.",
+  holders:(nm,n)=>`${nm}: ${n} ${enPl(n,"ingredient","ingredients")}`,
+  noMine:"You can't brew this from what's in your bag. Turn off “Only my ingredients” to see what's missing.",impossible:"These effects can't be combined in one potion.",
+  pts:"pts",sec:"s",locale:"en-GB",
+  reading:"Reading save…",
+  done:(k,t,nm,loc,when)=>`Done: <b>${k}</b> ${enPl(k,"kind","kinds")}, <b>${t}</b> ${enPl(t,"item","items")}. ${nm}, ${loc}, saved ${when}.`,
+  noIngs:(nm,when)=>`${nm}'s save (${when}) has no ingredients.`,
+  errNotSave:"This isn't a Skyrim save file (.ess).",errNoPlayer:"Couldn't find the player in this save.",errRead:"Couldn't read the file. Is it a Skyrim Special Edition save?",
+  pickDirFF:"Pick the <b>Saves folder</b> and confirm. Firefox may ask whether to upload the files: say yes. Nothing leaves your computer, only this page reads them.",
+  permAsk:"The browser is asking for access to the Saves folder. Choose <b>Allow on every visit</b> so you don't have to confirm it next time. The page only reads saves.",
+  pickDir:"Pick the <b>Saves folder</b>: Documents → My Games → Skyrim Special Edition → Saves. Save files aren't shown in that window, that's expected. Then the browser asks for access: choose <b>Allow on every visit</b>.",
+  noSaves:"No saves in this folder. You need the Saves folder inside My Games → Skyrim Special Edition.",
+  noPick:"No folder picked. Press the button again when ready.",noAccess:"The browser didn't allow folder access. Pick the save file instead.",
+  alchFromSave:h=>`My alchemist updated from the save: ${h}. Fortify Alchemy from gear is set by hand.`,
+  took:k=>` <span>Used the newest ${k} in the folder.</span>`,kQuick:"quicksave",kAuto:"autosave",kSave:"save",dropEss:"Drop a save file with the .ess extension.",
+  src:{DG:"Dawnguard",HF:"Hearthfire",DB:"Dragonborn",FISH:"Fishing",CUR:"Curios",SS:"Saints & Seducers","CUR+SS":"Curios · S&S"}
+},
+ru:{
+  sub:n=>`Калькулятор зелий для Skyrim SE / AE · ${n} ${ruPl(n,"ингредиент","ингредиента","ингредиентов")}: основа, Dawnguard, Hearthfire, Dragonborn, Рыбалка, Редкие диковинки, Saints & Seducers`,
+  tabBrew:"Что я могу сварить",tabFind:"Как сварить нужное",help:"Как пользоваться",close:"Закрыть",
+  settings:"Мой алхимик",skill:"Навык алхимии",perk:"Перк «Алхимик»",none:"нет",phys:"Врач",bene:"Благодетель",pois:"Отравитель",pure:"Чистота",fort:"Усиление алхимии, %",
+  hint:S=>`навык ${S.skill}, Алхимик ${S.alch}/5${S.phys?", Врач":""}${S.bene?", Благодетель":""}${S.pois?", Отравитель":""}${S.pure?", Чистота":""}${S.fort?`, +${S.fort}%`:""}`,
+  bag:"Сумка ингредиентов",searchIng:"Название или эффект…",gameLoad:"Обновить сумку из игры",gameFile:"Выбрать файл сейва",
+  gameHint:"Сохранись в игре и нажми кнопку. В первый раз укажи папку Документы → My Games → Skyrim Special Edition → Saves. Можно и просто перетащить файл .ess на страницу.",
+  owned:"Только мои",clear:"Очистить сумку",sample:"В сумке лежит пример набора. Загрузи свой сейв, поставь свои количества или очисти сумку.",
+  brewH:"Что можно сварить",all:"Всё",potions:"Зелья",poisons:"Яды",noSide:"Без побочных эффектов",brewSearch:"Фильтр по эффекту…",
+  sortValue:"Сначала дорогие",sortCount:"Сначала самые массовые",sortEff:"Больше эффектов",
+  findH:"Какое зелье нужно",onlyMine:"Только из моих ингредиентов",clean:"Без лишних эффектов выше",
+  note:"Сила и цена считаются по формулам игры с учётом навыка и перков. На каждое зелье тратится по одному каждого ингредиента. В игре эффект берётся у ингредиента, у которого он сильнее, а зелье или яд определяется самым сильным эффектом.",
+  disclaimer:"Неофициальный фанатский инструмент, не связан с Bethesda.",
+  kinds:n=>`в сумке ${n} ${ruPl(n,"вид","вида","видов")}`,less:"Меньше",more:"Больше",qty:"Количество",
+  emptyOwned:"В сумке пока пусто. Загрузи сейв или сними фильтр «Только мои» и добавь ингредиенты кнопкой +.",nothing:"Ничего не найдено.",
+  inBag:n=>`в сумке ${n}`,notInBag:"нет в сумке",potion:"зелье",poison:"яд",
+  title:(p,name)=>(p?"Яд: ":"Зелье: ")+name.toLowerCase(),value:"цена ≈",canBrew:n=>`можно сварить <b class="num">${n}</b> шт.`,lacking:"не хватает ингредиентов",
+  per1:p=>`На 1 ${p?"яд":"зелье"} положи в котёл:`,
+  allN:(n,hl)=>`Чтобы сварить все ${n}: по ${n} шт. каждого.${hl?" Подсвечен ингредиент, которого меньше всего.":""}`,
+  side:p=>p?"Есть побочный эффект: полезный эффект в яде":"Есть побочный эффект: вредный эффект в зелье",
+  need2:"Добавь в сумку хотя бы два ингредиента, и здесь появятся все зелья, которые из них выходят.",
+  recipes:n=>`${n} ${ruPl(n,"рецепт","рецепта","рецептов")}`,showMore:n=>`Показать ещё (${n})`,noFilter:"С такими фильтрами ничего не выходит.",
+  addEff:"Добавить эффект…",remove:"Убрать",pickUp:"Выбери до трёх эффектов, которые должны быть в зелье.",
+  findEmpty:"Например, выбери «Восстановление здоровья», и здесь появятся ингредиенты с этим эффектом и лучшие сочетания.",
+  holders:(nm,n)=>`${nm}: ${n} ингр.`,
+  noMine:"Из того, что в сумке, такое не сварить. Сними фильтр «Только из моих», чтобы увидеть, чего не хватает.",impossible:"Такое сочетание эффектов в одном зелье не получить.",
+  pts:"ед.",sec:"с",locale:"ru-RU",
+  reading:"Читаю сохранение…",
+  done:(k,t,nm,loc,when)=>`Готово: <b>${k}</b> ${ruPl(k,"вид","вида","видов")}, <b>${t}</b> шт. ${nm}, ${loc}, сейв от ${when}.`,
+  noIngs:(nm,when)=>`В сейве персонажа ${nm} (${when}) ингредиентов нет.`,
+  errNotSave:"Это не файл сохранения Skyrim (.ess).",errNoPlayer:"В сохранении не нашёлся персонаж.",errRead:"Не удалось прочитать файл. Это точно сохранение Skyrim SE?",
+  pickDirFF:"Выбери <b>папку Saves</b> и подтверди. Firefox может спросить, загрузить ли файлы: соглашайся, файлы никуда не уходят, их читает только эта страница.",
+  permAsk:"Браузер спрашивает доступ к папке Saves. Выбери <b>Разрешать при каждом посещении</b>, чтобы больше не подтверждать. Страница только читает сейвы.",
+  pickDir:"Выбери <b>папку Saves</b>: Документы → My Games → Skyrim Special Edition → Saves. Сами файлы сейвов в этом окне не видны, так и должно быть. Потом браузер спросит доступ: выбери <b>Разрешать при каждом посещении</b>.",
+  noSaves:"В этой папке нет сохранений. Нужна папка Saves внутри My Games → Skyrim Special Edition.",
+  noPick:"Папку не выбрали. Нажми кнопку ещё раз, когда будешь готов.",noAccess:"Браузер не дал доступ к папке, выбери файл сейва вручную.",
+  alchFromSave:h=>`«Мой алхимик» обновлён из сейва: ${h}. Усиление алхимии от экипировки ставится вручную.`,
+  took:k=>` <span>Взято ${k}, самое свежее в папке.</span>`,kQuick:"быстрое сохранение",kAuto:"автосохранение",kSave:"сохранение",dropEss:"Перетащи файл сохранения с расширением .ess.",
+  src:{DG:"Dawnguard",HF:"Hearthfire",DB:"Dragonborn",FISH:"Рыбалка",CUR:"Диковинки",SS:"Saints & Seducers","CUR+SS":"Диковинки · S&S"}
+}};
+const store={get(k,d){try{const v=localStorage.getItem("alch:"+k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem("alch:"+k,JSON.stringify(v))}catch(e){}}};
+let LANG=store.get("lang",null)||((navigator.language||"").toLowerCase().startsWith("ru")?"ru":"en");
+if(!T[LANG]) LANG="en";
+const L=()=>T[LANG];
+
+/* ---------- data ---------- */
+const E=DATA.E.map(([edid,en,ru,flags,cost])=>({edid,n:{en,ru},flags,cost,hostile:!!(flags&1),pmag:!!(flags&0x200000),pdur:!!(flags&0x400000)}));
+const I=DATA.I.map(([edid,en,ru,src,value,weight,effs],i)=>({i,edid,n:{en,ru},src,value,weight,effs:effs.map(([e,mag,dur])=>({e,mag,dur})),eset:new Set(effs.map(x=>x[0])),cat:category(edid,src)}));
+const en=x=>x.n[LANG];
+function sortI(){I.sort((a,b)=>en(a).localeCompare(en(b),LANG))}
+sortI();
+function category(edid,src){
+  const s=edid;
+  if(src==="FISH"||/Fish|Salmon|Scalon|Slaughterfish/.test(s)) return "fish";
+  if(/Salt|Pearl|Dust|Oil|Ash|Ectoplasm|Void|Silk|Venin|Wax|Soap|Ichor|Putrescence|Jelly|Gall|Wrapping|BoneMeal|Ashes/.test(s)) return "mineral";
+  if(/Moth|Dragonfly|Firefly|Bee|Chaurus|Spider|Elytra|Scrib|Butterfly|Blissbug/.test(s)) return "insect";
+  if(/Mushroom|Tapinella|Pholiota|Fungal|Cap|Stalk|Russula|Spore|Hypha|Lichen|BogBeacon/.test(s)) return "mushroom";
+  if(/Antler|Sabrecat|Bear|Mudcrab|Hawk|Egg|Roe|Tooth|Teeth|Claw|Feather|Tusk|Skeever|Troll|Giant|Hide|Horn|FalmerEar|Heart|Flesh|Kagouti|Daedroth|Ogre|Minotaur/.test(s)) return "animal";
+  return "plant";
+}
+const ICONS={
+  plant:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19c0-8 6-13 14-14-1 8-6 14-14 14z"/><path d="M5 19l8-8"/></svg>',
+  mushroom:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 7 0 0 1 18 0z"/><path d="M10 12v6a2 2 0 0 0 4 0v-6"/></svg>',
+  insect:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v14"/><path d="M12 9C9 3 3 4 4 9s6 4 8 2"/><path d="M12 9c3-6 9-5 8 0s-6 4-8 2"/><path d="M12 14c-2 3-6 5-7 3"/><path d="M12 14c2 3 6 5 7 3"/></svg>',
+  animal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20c1-6 1-11 4-16"/><path d="M11 20c1-5 2-9 5-13"/><path d="M16 20c1-3 2-6 4-8"/></svg>',
+  fish:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c4-5 10-6 15 0-5 6-11 5-15 0z"/><path d="M18 12l3-3v6z"/><circle cx="8" cy="11" r=".8" fill="currentColor"/></svg>',
+  mineral:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10l4 6-9 12L3 9z"/><path d="M3 9h18M9 3l3 18 3-18"/></svg>'
+};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const $=id=>document.getElementById(id);
+
+/* ---------- state ---------- */
+const SAMPLE={Lavender:4,Nightshade:3,deathBell:2,MountainFlower01Blue:5,MountainFlower01Red:3,Wheat:4,GiantLichen:2,MothWingBlue:3,HangingMoss:6,Garlic:5,SaltPile:4,SkeeverTail:2,JuniperBerries:3,Snowberry:4,TundraCotton:3,ElvesEar:2,Thistle01:2,CharredSkeeverHide:2,FrostMirriam:3};
+let inv=store.get("inv",null),isSample=false;
+if(!inv){inv={};I.forEach(x=>{if(SAMPLE[x.edid])inv[x.edid]=SAMPLE[x.edid]});isSample=true}
+let S=Object.assign({skill:15,alch:0,phys:false,bene:false,pois:false,pure:false,fort:0},store.get("set",{}));
+let ui={tab:"brew",owned:false,kind:"all",purebrew:false,sort:"value",wanted:[],onlymine:false,clean:true,limitB:40,limitF:30};
+Object.assign(ui,store.get("ui",{}),{limitB:40,limitF:30});
+const cnt=x=>inv[x.edid]||0;
+function saveInv(){isSample=false;store.set("inv",inv);$("sample-note").hidden=true}
+
+/* ---------- alchemy math ---------- */
+const RESTORE=new Set(["AlchRestoreHealth","AlchRestoreMagicka","AlchRestoreStamina"]);
+function baseFactor(){return 4*(1+0.5*S.skill/100)*(1+0.2*S.alch)*(1+S.fort/100)}
+function effVal(e,mag,dur){const m=mag>0?Math.pow(mag,1.1):1,d=dur>0?Math.pow(dur/10,1.1):1;return E[e].cost*m*d}
+function scaled(e,mag,dur,f){return {mag:E[e].pmag?Math.round(mag*f):Math.round(mag),dur:E[e].pdur?Math.round(dur*f):dur}}
+function brew(ings){
+  const tally=new Map();
+  for(const ing of ings) for(const ef of ing.effs){if(!tally.has(ef.e)) tally.set(ef.e,[]);tally.get(ef.e).push(ef)}
+  const bf=baseFactor();let fx=[];
+  for(const [e,list] of tally){
+    if(list.length<2) continue;
+    let best=null,bv=-1;
+    for(const ef of list){const s=scaled(e,ef.mag,ef.dur,bf);const v=effVal(e,s.mag,s.dur);if(v>bv){bv=v;best=ef}}
+    fx.push({e,mag:best.mag,dur:best.dur,v:bv});
+  }
+  if(!fx.length) return null;
+  fx.sort((a,b)=>b.v-a.v);
+  const poison=E[fx[0].e].hostile;
+  if(S.pure) fx=fx.filter(x=>E[x.e].hostile===poison);
+  const out=fx.map(x=>{
+    let f=bf;
+    if(S.phys&&RESTORE.has(E[x.e].edid)) f*=1.25;
+    if(S.bene&&!poison&&!E[x.e].hostile) f*=1.25;
+    if(S.pois&&poison&&E[x.e].hostile) f*=1.25;
+    const s=scaled(x.e,x.mag,x.dur,f);
+    return {e:x.e,mag:s.mag,dur:s.dur,v:Math.floor(effVal(x.e,s.mag,s.dur))};
+  });
+  const value=out.reduce((a,x)=>a+x.v,0);
+  const side=out.filter(x=>E[x.e].hostile!==poison).length;
+  return {ings,poison,fx:out,value,side,main:out[0].e,eset:new Set(out.map(x=>x.e))};
+}
+function minimal(r){
+  if(r.ings.length<3) return true;
+  const [a,b,c]=r.ings;
+  for(const pair of [[a,b],[a,c],[b,c]]){const p=brew(pair);if(p&&p.eset.size>=r.eset.size) return false}
+  return true;
+}
+const PCT=/Resist|Weakness|Fortify(Sneak|Restoration|Alteration|Illusion|Block|LightArmor|Destruction|OneHanded|Conjuration|HeavyArmor|Smithing|Lockpicking|Pickpocket|TwoHanded|Marksman|Barter|Enchanting|Persuasion|MagickaRate|StaminaRate|HealRate)|AbsorbSpell|DamageStaminaRate|DamageMagickaRate/;
+function fmtEff(x){
+  const e=E[x.e],parts=[];
+  if(x.mag>0&&!/Paralysis|Invisib|Waterbreath|NightEye|Light|CureDisease|CurePoison/.test(e.edid)) parts.push(x.mag+(PCT.test(e.edid)?"%":" "+L().pts));
+  if(x.dur>0) parts.push(x.dur+" "+L().sec);
+  return parts.join(" · ")||"—";
+}
+
+/* ---------- render: ingredients ---------- */
+const effChips=(ing,hit)=>ing.effs.map(f=>`<span class="eff${E[f.e].hostile?" neg":""}${hit&&hit.has(f.e)?" hit":""}">${esc(en(E[f.e]))}</span>`).join("");
+const badge=x=>{const s=L().src[x.src];return s?`<span class="badge">${s}</span>`:""};
+const match=(o,q)=>o.n.en.toLowerCase().includes(q)||o.n.ru.toLowerCase().includes(q);
+function ownCount(){const n=I.filter(x=>cnt(x)>0).length;$("own-count").textContent=n?L().kinds(n):""}
+function renderIngs(){
+  const q=$("ing-search").value.trim().toLowerCase();
+  const hit=ui.tab==="find"?new Set(ui.wanted):null;
+  const rows=I.filter(x=>(!ui.owned||cnt(x)>0)&&(!q||match(x,q)||x.effs.some(f=>match(E[f.e],q))));
+  $("ing-list").innerHTML=rows.length?rows.map(x=>`
+    <div class="ing${cnt(x)?" owned":""}">
+      <div class="ico">${ICONS[x.cat]}</div>
+      <div class="ing-name">${esc(en(x))}${badge(x)}</div>
+      <div class="step"><button aria-label="${L().less}: ${esc(en(x))}" data-d="-1" data-k="${x.edid}">−</button><input id="q-${x.edid}" aria-label="${L().qty}: ${esc(en(x))}" inputmode="numeric" value="${cnt(x)}" data-k="${x.edid}"><button aria-label="${L().more}: ${esc(en(x))}" data-d="1" data-k="${x.edid}">+</button></div>
+      <div class="effs">${effChips(x,hit)}</div>
+    </div>`).join(""):`<div class="empty">${ui.owned?L().emptyOwned:L().nothing}</div>`;
+  ownCount();
+}
+$("ing-list").addEventListener("click",ev=>{
+  const b=ev.target.closest("button[data-d]");if(!b) return;
+  const k=b.dataset.k;inv[k]=Math.max(0,(inv[k]||0)+Number(b.dataset.d));if(!inv[k]) delete inv[k];
+  saveInv();const inp=$("q-"+k);if(inp){inp.value=inv[k]||0;inp.closest(".ing").classList.toggle("owned",!!inv[k])}
+  ownCount();schedule();
+});
+$("ing-list").addEventListener("change",ev=>{
+  const t=ev.target;if(!t.dataset.k) return;
+  const v=Math.max(0,parseInt(t.value,10)||0);if(v) inv[t.dataset.k]=v;else delete inv[t.dataset.k];
+  t.value=v;t.closest(".ing").classList.toggle("owned",!!v);saveInv();ownCount();schedule();
+});
+
+/* ---------- render: results ---------- */
+function recipePills(r){
+  const can=Math.min(...r.ings.map(cnt));
+  return r.ings.map((x,k)=>{
+    const have=cnt(x),lim=can>0&&have===can&&r.ings.some(y=>cnt(y)>can);
+    return (k?`<span class="plus">+</span>`:"")+`<span class="rpill${have?"":" miss"}${lim?" limit":""}"><span class="ico">${ICONS[x.cat]}</span><b class="num">1 ×</b> ${esc(en(x))}<small>${have?L().inBag(have):L().notInBag}</small></span>`;
+  }).join("");
+}
+function card(r){
+  const can=Math.min(...r.ings.map(cnt));
+  return `<article class="card">
+    <div class="card-top"><div><span class="kind ${r.poison?"poison":"potion"}">${r.poison?L().poison:L().potion}</span><span class="pname">${esc(L().title(r.poison,en(E[r.main])))}</span></div>
+      <div class="meta"><span>${L().value} <b class="num">${r.value}</b></span><span>${can?L().canBrew(can):L().lacking}</span></div></div>
+    <div class="rlabel">${L().per1(r.poison)}</div>
+    <div class="recipe">${recipePills(r)}</div>
+    ${can>1?`<div class="rlabel">${L().allN(can,r.ings.some(y=>cnt(y)>can))}</div>`:""}
+    <div class="efflines">${r.fx.map(x=>`<div class="efl${E[x.e].hostile?" neg":""}"><span>${esc(en(E[x.e]))}</span><span class="num">${fmtEff(x)}</span></div>`).join("")}</div>
+    ${r.side?`<div class="impure">${L().side(r.poison)}</div>`:""}
+  </article>`;
+}
+function combosFrom(pool){
+  const res=[],n=pool.length;
+  for(let a=0;a<n;a++)for(let b=a+1;b<n;b++){const r=brew([pool[a],pool[b]]);if(r)res.push(r)}
+  const share=(x,y)=>x.effs.some(f=>y.eset.has(f.e));
+  for(let a=0;a<n;a++)for(let b=a+1;b<n;b++)for(let c=b+1;c<n;c++){
+    const A=pool[a],B=pool[b],C=pool[c];
+    if(!((share(A,B)||share(A,C))&&(share(B,A)||share(B,C))&&(share(C,A)||share(C,B)))) continue;
+    const r=brew([A,B,C]);if(r&&minimal(r)) res.push(r);
+  }
+  return res;
+}
+function renderBrew(){
+  const box=$("brew-results"),pool=I.filter(x=>cnt(x)>0);
+  if(pool.length<2){box.innerHTML=`<div class="empty">${L().need2}</div>`;$("brew-count").textContent="";return}
+  let res=combosFrom(pool);
+  const q=$("brew-search").value.trim().toLowerCase();
+  res=res.filter(r=>(ui.kind==="all"||(ui.kind==="poison")===r.poison)&&(!ui.purebrew||!r.side)&&(!q||r.fx.some(x=>match(E[x.e],q))));
+  const can=r=>Math.min(...r.ings.map(cnt));
+  if(ui.sort==="value") res.sort((a,b)=>b.value-a.value);
+  else if(ui.sort==="count") res.sort((a,b)=>can(b)-can(a)||b.value-a.value);
+  else res.sort((a,b)=>b.fx.length-a.fx.length||b.value-a.value);
+  $("brew-count").textContent=L().recipes(res.length);
+  box.innerHTML=res.length?res.slice(0,ui.limitB).map(card).join("")+(res.length>ui.limitB?`<button class="chipbtn more" id="more-b">${L().showMore(res.length-ui.limitB)}</button>`:""):`<div class="empty">${L().noFilter}</div>`;
+  const m=$("more-b");if(m) m.onclick=()=>{ui.limitB+=40;renderBrew()};
+}
+function fillPicker(){
+  const sel=$("eff-pick"),used=new Set();I.forEach(x=>x.effs.forEach(f=>used.add(f.e)));
+  const opts=[...used].sort((a,b)=>en(E[a]).localeCompare(en(E[b]),LANG));
+  const grp=(h,t)=>`<optgroup label="${t}">`+opts.filter(e=>E[e].hostile===h).map(e=>`<option value="${e}">${esc(en(E[e]))}</option>`).join("")+"</optgroup>";
+  sel.innerHTML=`<option value="">${L().addEff}</option>`+grp(false,L().potions)+grp(true,L().poisons);
+}
+$("eff-pick").addEventListener("change",ev=>{
+  const v=ev.target.value;ev.target.value="";
+  if(v===""||ui.wanted.includes(+v)||ui.wanted.length>=3) return;
+  ui.wanted.push(+v);ui.limitF=30;saveUi();renderFind();renderIngs();
+});
+$("wanted").addEventListener("click",ev=>{
+  const b=ev.target.closest("button[data-e]");if(!b) return;
+  ui.wanted=ui.wanted.filter(e=>e!==+b.dataset.e);saveUi();renderFind();renderIngs();
+});
+function renderFind(){
+  const w=ui.wanted,wbox=$("wanted"),hbox=$("holders"),box=$("find-results");
+  wbox.innerHTML=w.length?w.map(e=>`<span class="wchip${E[e].hostile?" neg":""}">${esc(en(E[e]))}<button aria-label="${L().remove}: ${esc(en(E[e]))}" data-e="${e}">×</button></span>`).join(""):`<span class="sub">${L().pickUp}</span>`;
+  if(!w.length){hbox.innerHTML="";box.innerHTML=`<div class="empty">${L().findEmpty}</div>`;return}
+  const holders=w.map(e=>I.filter(x=>x.eset.has(e)));
+  hbox.innerHTML=w.map((e,k)=>`<h3>${esc(L().holders(en(E[e]),holders[k].length))}</h3><div class="recipe">${holders[k].slice().sort((a,b)=>cnt(b)-cnt(a)||en(a).localeCompare(en(b),LANG)).map(x=>`<span class="rpill${cnt(x)?"":" miss"}"><span class="ico">${ICONS[x.cat]}</span>${esc(en(x))}${cnt(x)?` <small class="num">×${cnt(x)}</small>`:""}</span>`).join("")}</div>`).join("");
+  const pool=ui.onlymine?I.filter(x=>cnt(x)>0):I;
+  const keys=new Set(),res=[];
+  const ok=r=>r&&w.every(e=>r.eset.has(e));
+  const anyH=new Set(holders.flat().map(x=>x.i));
+  const hp=pool.filter(x=>anyH.has(x.i));
+  const push=r=>{const k=r.ings.map(x=>x.i).sort((a,b)=>a-b).join(",");if(!keys.has(k)){keys.add(k);res.push(r)}};
+  for(let a=0;a<hp.length;a++)for(let b=a+1;b<hp.length;b++){const r=brew([hp[a],hp[b]]);if(ok(r))push(r)}
+  for(let a=0;a<hp.length;a++)for(let b=a+1;b<hp.length;b++)for(const c of pool){
+    if(c===hp[a]||c===hp[b]) continue;
+    const r=brew([hp[a],hp[b],c]);if(ok(r)&&minimal(r)) push(r);
+  }
+  const wantPoison=E[w[0]].hostile;
+  let list=res.filter(r=>r.poison===wantPoison);
+  if(ui.clean) list=list.filter(r=>w.includes(r.main));
+  const own=r=>r.ings.every(x=>cnt(x)>0)?1:0,ownN=r=>r.ings.filter(x=>cnt(x)>0).length;
+  list.sort((a,b)=>own(b)-own(a)||a.side-b.side||ownN(b)-ownN(a)||a.ings.length-b.ings.length||b.value-a.value);
+  box.innerHTML=list.length?list.slice(0,ui.limitF).map(card).join("")+(list.length>ui.limitF?`<button class="chipbtn more" id="more-f">${L().showMore(list.length-ui.limitF)}</button>`:""):`<div class="empty">${ui.onlymine?L().noMine:L().impossible}</div>`;
+  const m=$("more-f");if(m) m.onclick=()=>{ui.limitF+=30;renderFind()};
+}
+
+/* ---------- controls ---------- */
+function saveUi(){store.set("ui",{tab:ui.tab,owned:ui.owned,kind:ui.kind,purebrew:ui.purebrew,sort:ui.sort,wanted:ui.wanted,onlymine:ui.onlymine,clean:ui.clean})}
+let tmr=null;function schedule(){clearTimeout(tmr);tmr=setTimeout(()=>{ui.tab==="brew"?renderBrew():renderFind()},120)}
+function setTab(tab){
+  ui.tab=tab;saveUi();
+  $("tab-brew").setAttribute("aria-selected",tab==="brew");
+  $("tab-find").setAttribute("aria-selected",tab==="find");
+  $("pane-brew").hidden=tab!=="brew";$("pane-find").hidden=tab!=="find";
+  renderIngs();tab==="brew"?renderBrew():renderFind();
+}
+$("tab-brew").onclick=()=>setTab("brew");
+$("tab-find").onclick=()=>setTab("find");
+const toggle=(id,key,after)=>{const b=$(id);b.setAttribute("aria-pressed",ui[key]);b.onclick=()=>{ui[key]=!ui[key];b.setAttribute("aria-pressed",ui[key]);saveUi();after()}};
+toggle("f-owned","owned",renderIngs);toggle("f-pure","purebrew",renderBrew);toggle("f-onlymine","onlymine",renderFind);toggle("f-clean","clean",renderFind);
+document.querySelectorAll("[data-kind]").forEach(b=>{b.setAttribute("aria-pressed",b.dataset.kind===ui.kind);b.onclick=()=>{ui.kind=b.dataset.kind;document.querySelectorAll("[data-kind]").forEach(x=>x.setAttribute("aria-pressed",x===b));saveUi();renderBrew()}});
+const bsel=$("brew-sort");bsel.value=ui.sort;bsel.onchange=()=>{ui.sort=bsel.value;saveUi();renderBrew()};
+$("ing-search").addEventListener("input",renderIngs);
+$("brew-search").addEventListener("input",schedule);
+$("clear-inv").onclick=()=>{inv={};saveInv();renderIngs();schedule()};
+const help=$("help");
+$("help-open").onclick=()=>{if(help.showModal)help.showModal();else help.setAttribute("open","")};
+$("help-close").onclick=()=>help.close?help.close():help.removeAttribute("open");
+help.addEventListener("click",e=>{if(e.target===help)help.close()});
+
+const setHint=()=>{$("set-hint").textContent=L().hint(S)};
+function syncSettings(){
+  $("s-skill").value=S.skill;$("s-skill-v").textContent=S.skill;$("s-alch").value=S.alch;
+  ["phys","bene","pois","pure"].forEach(k=>$("s-"+k).checked=S[k]);$("s-fort").value=S.fort;setHint();
+}
+function bindSettings(){
+  const sk=$("s-skill"),skv=$("s-skill-v");
+  syncSettings();
+  const upd=()=>{S.skill=+sk.value;skv.textContent=S.skill;S.alch=+$("s-alch").value;["phys","bene","pois","pure"].forEach(k=>S[k]=$("s-"+k).checked);S.fort=Math.max(0,+$("s-fort").value||0);store.set("set",S);setHint();schedule()};
+  document.querySelectorAll(".set-grid input,.set-grid select").forEach(el=>el.addEventListener("input",upd));
+}
+
+/* ---------- language ---------- */
+let gstatState={k:"gameHint"};
+function applyLang(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll("[data-t]").forEach(el=>{const v=L()[el.dataset.t];if(typeof v==="string")el.textContent=v});
+  document.querySelectorAll("[data-tp]").forEach(el=>el.placeholder=L()[el.dataset.tp]);
+  document.querySelectorAll("[data-setlang]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.setlang===LANG));
+  $("sub").textContent=L().sub(I.length);
+  setHint();sortI();fillPicker();redrawStat();
+  if(document.readyState!=="loading"&&$("ing-list").childElementCount) setTab(ui.tab);
+}
+document.querySelectorAll("[data-setlang]").forEach(b=>b.onclick=()=>{LANG=b.dataset.setlang;store.set("lang",LANG);applyLang()});
+
+/* ---------- import from save (beta) ---------- */
+async function inflateZ(u8){
+  const ds=new DecompressionStream("deflate");
+  const buf=await new Response(new Blob([u8]).stream().pipeThrough(ds)).arrayBuffer();
+  return new Uint8Array(buf);
+}
+function lz4Block(src,outLen){
+  const out=new Uint8Array(outLen);let i=0,o=0;const n=src.length;
+  while(i<n){
+    const tok=src[i++];let lit=tok>>4;
+    if(lit===15){let b;do{b=src[i++];lit+=b}while(b===255)}
+    out.set(src.subarray(i,i+lit),o);i+=lit;o+=lit;
+    if(i>=n)break;
+    const off=src[i]|(src[i+1]<<8);i+=2;let ml=tok&15;
+    if(ml===15){let b;do{b=src[i++];ml+=b}while(b===255)}
+    ml+=4;const st=o-off;
+    if(off>=ml){out.copyWithin(o,st,st+ml);o+=ml}
+    else{for(let k=0;k<ml;k++)out[o++]=out[st+k]}
+  }
+  return out;
+}
+class SaveErr extends Error{constructor(code){super(code);this.code=code}}
+async function parseSave(ab,FIDMAP){
+  const b=new Uint8Array(ab),dv=new DataView(ab),td=new TextDecoder("utf-8");
+  if(td.decode(b.subarray(0,13))!=="TESV_SAVEGAME") throw new SaveErr("errNotSave");
+  let p=13;const hsz=dv.getUint32(p,true);p+=4;const h0=p;
+  const ver=dv.getUint32(p,true);p+=8;
+  const ws=()=>{const l=dv.getUint16(p,true);const s=td.decode(b.subarray(p+2,p+2+l));p+=2+l;return s};
+  const name=ws();const level=dv.getUint32(p,true);p+=4;const loc=ws();ws();ws();
+  p+=2+4+4+8;
+  const sw=dv.getUint32(p,true),sh=dv.getUint32(p+4,true);p+=8;
+  const comp=ver>=12?dv.getUint16(p,true):0;
+  p=h0+hsz;p+=sw*sh*(ver>=11?4:3);
+  const base=p;let body;
+  if(comp){
+    const ulen=dv.getUint32(p,true),clen=dv.getUint32(p+4,true);p+=8;
+    const src=b.subarray(p,p+clen);
+    body=comp===2?lz4Block(src,ulen):await inflateZ(src);
+  }else body=b.subarray(p);
+  const bv=new DataView(body.buffer,body.byteOffset,body.byteLength);
+  const fver=body[0],pis=bv.getUint32(1,true);
+  let q=5;const plugins=[],light=[];
+  const bws=()=>{const l=bv.getUint16(q,true);const s=td.decode(body.subarray(q+2,q+2+l));q+=2+l;return s};
+  const cn=body[q++];for(let k=0;k<cn;k++)plugins.push(bws());
+  if(fver>=78){const c2=bv.getUint16(q,true);q+=2;for(let k=0;k<c2;k++)light.push(bws())}
+  const ft=5+pis,U=k=>bv.getUint32(ft+4*k,true);
+  const fia=U(0)-base,cfo=U(4)-base,ncf=U(9);
+  const nfid=bv.getUint32(fia,true);
+  const FIDS=new Uint32Array(nfid);for(let k=0;k<nfid;k++)FIDS[k]=bv.getUint32(fia+4+4*k,true);
+  // ingredient formIDs for this save's load order
+  const pl=Object.fromEntries(plugins.map((n,i)=>[n.toLowerCase(),i]));
+  const ll=Object.fromEntries(light.map((n,i)=>[n.toLowerCase(),i]));
+  const fid2ed=new Map();
+  for(const [ed,[plug,local,alias]] of Object.entries(FIDMAP)){
+    const k=plug.toLowerCase(),to=alias||ed;
+    if(k in pl) fid2ed.set(((pl[k]<<24)|local)>>>0,to);
+    else if(k in ll) fid2ed.set((0xFE000000|(ll[k]<<12)|(local&0xFFF))>>>0,to);
+  }
+  // player reference (RefID 0x400014) holds inventory and perks; player base NPC (0x400007) holds skills
+  let c=cfo,P=null,N=null;
+  for(let k=0;k<ncf&&!(P&&N);k++){
+    const r0=body[c],r1=body[c+1],r2=body[c+2],typ=body[c+7];c+=9;
+    const ls=typ>>6,w=ls===0?1:ls===1?2:4;
+    const rd=x=>w===1?body[x]:w===2?bv.getUint16(x,true):bv.getUint32(x,true);
+    const l1=rd(c),l2=rd(c+w);c+=2*w;
+    if(r0===0x40&&r1===0&&(r2===0x14||r2===0x07)){const d=body.subarray(c,c+l1);const u=l2?await inflateZ(d):d;if(r2===0x14)P=u;else N=u}
+    c+=l1;
+  }
+  if(!P) throw new SaveErr("errNoPlayer");
+  const pv=new DataView(P.buffer,P.byteOffset,P.byteLength);
+  const refid=i=>{const v=(P[i]<<16)|(P[i+1]<<8)|P[i+2];const t=v>>>22,x=v&0x3FFFFF;
+    if(t===0)return x>0&&x<=FIDS.length?FIDS[x-1]:0;
+    if(t===1)return x;
+    if(t===2)return (0xFF000000|x)>>>0;return 0};
+  const vs=i=>{const t=P[i]&3;
+    if(t===0)return[P[i]>>2,1];if(t===1)return[pv.getUint16(i,true)>>2,2];
+    if(t===2)return[(P[i]|(P[i+1]<<8)|(P[i+2]<<16))>>2,3];return[1e9,1]};
+  const itemOk=j=>{if(j+8>P.length)return false;const r=refid(j);if(!r)return false;
+    const n=pv.getInt32(j+3,true),lim=r===0xF?1e7:20000;if(n===0||n<=-lim||n>=lim)return false;return vs(j+7)[0]<=8};
+  const chain=(j,left)=>{for(let d=0;d<Math.min(4,left);d++){if(!itemOk(j))return false;const[e,ew]=vs(j+7);if(e)return true;j+=7+ew}return true};
+  const parseAt=s=>{const[n,w]=vs(s);if(n<1||n>5000)return null;let i=s+w;const items=[];
+    for(let k=0;k<n;k++){
+      if(!chain(i,n-k)){
+        if(!items.length||items[items.length-1][2]===0)return null;
+        let j=-1;for(let t=i+1;t<i+400;t++){if(chain(t,n-k)){j=t;break}}
+        if(j<0)return null;i=j;
+      }
+      const r=refid(i),cv=pv.getInt32(i+3,true),[e,ew]=vs(i+7);items.push([r,cv,e]);i+=7+ew;
+    }return items};
+  let best=null,bestScore=-1;
+  for(let s=0;s<Math.min(P.length-8,20000);s++){
+    const items=parseAt(s);if(!items)continue;
+    const score=items.filter(x=>fid2ed.has(x[0])).length*100000+items.length;
+    if(score>bestScore){bestScore=score;best=items}
+  }
+  const ings={};
+  if(best) for(const [r,n] of best){const ed=fid2ed.get(r);if(ed&&n>0)ings[ed]=(ings[ed]||0)+n}
+  return {name,level,loc,items:best?best.length:0,ings,alch:readAlchemist(P,N,name,refid,vs)};
+}
+// Alchemy perks: the player's perk list is a vsval count followed by [RefID(3), rank(1)] entries
+const ALCH_PERKS={0xBE127:"a1",0xC07CA:"a2",0xC07CB:"a3",0xC07CC:"a4",0xC07CD:"a5",0x58215:"phys",0x58216:"bene",0x58217:"pois",0x5821D:"pure"};
+function readAlchemist(P,N,name,refid,vs){
+  const found=new Set();let lists=0;
+  for(let s=0;s<P.length-5;s++){
+    const [n,w]=vs(s);if(n<1||n>2000||s+w+4*n>P.length) continue;
+    let i=s+w,ok=true;const hits=[];
+    for(let k=0;k<n;k++,i+=4){const r=refid(i),rk=P[i+3];if(!r||rk<1||rk>10){ok=false;break}if(ALCH_PERKS[r])hits.push(ALCH_PERKS[r])}
+    if(ok&&hits.length){lists++;hits.forEach(h=>found.add(h))}
+  }
+  let alch=0;for(let k=1;k<=5;k++) if(found.has("a"+k)) alch=k;
+  // Skill: the player's base actor values are [u32 AV index, f32 value] pairs; Alchemy is AV 16
+  let skill=null;
+  const dv=new DataView(P.buffer,P.byteOffset,P.byteLength);
+  for(let i=8;i+12<=P.length;i++){
+    if(dv.getUint32(i,true)!==16) continue;
+    const f=dv.getFloat32(i+4,true),a=dv.getUint32(i-8,true),b=dv.getUint32(i+8,true);
+    if(f>=1&&f<=1000&&Number.isInteger(f)&&a<16&&b>16&&b<200){skill=f;break}
+  }
+  // fallback: race starting skills stored after the player's name in the NPC record
+  if(skill==null&&N){
+    const nb=new TextEncoder().encode(name);
+    for(let i=0;i+2+nb.length+18<=N.length;i++){
+      if(N[i]!==(nb.length&255)||N[i+1]!==(nb.length>>8)) continue;
+      let eq=true;for(let k=0;k<nb.length;k++) if(N[i+2+k]!==nb[k]){eq=false;break}
+      if(!eq) continue;
+      const sk=N.subarray(i+2+nb.length,i+2+nb.length+18);
+      if([...sk].every(v=>v>=5&&v<=255)){skill=sk[10];break}
+    }
+  }
+  return {skill,alch,phys:found.has("phys"),bene:found.has("bene"),pois:found.has("pois"),pure:found.has("pure")};
+}
+const idb={
+  open(){return new Promise((res,rej)=>{const r=indexedDB.open("alch",1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})},
+  async get(k){try{const db=await this.open();return await new Promise(res=>{const q=db.transaction("kv").objectStore("kv").get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>res(null)})}catch(e){return null}},
+  async set(k,v){try{const db=await this.open();await new Promise(res=>{const tx=db.transaction("kv","readwrite");tx.objectStore("kv").put(v,k);tx.oncomplete=res;tx.onerror=res})}catch(e){}}
+};
+// status line remembers what it says so it can be re-rendered in the other language
+function redrawStat(){
+  const s=gstatState,el=$("game-stat");let h;
+  if(s.k==="done") h=L().done(s.kinds,s.total,esc(s.name),esc(s.loc),new Date(s.when).toLocaleString(L().locale,{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}));
+  else if(s.k==="noIngs") h=L().noIngs(esc(s.name),new Date(s.when).toLocaleString(L().locale,{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}));
+  else h=L()[s.k];
+  if(s.took) h+=L().took(L()[s.took]);
+  if(s.alchSet) h+=` <span>${L().alchFromSave(L().hint(S))}</span>`;
+  el.innerHTML=h;el.classList.toggle("err",!!s.err);
+}
+const gstat=(k,err,extra)=>{gstatState=Object.assign({k,err},extra||{});redrawStat()};
+async function applySave(file,took){
+  gstat("reading");
+  try{
+    const r=await parseSave(await file.arrayBuffer(),FIDMAP);
+    const known=new Set(I.map(x=>x.edid));
+    inv={};for(const [k,v] of Object.entries(r.ings)) if(known.has(k)) inv[k]=v;
+    saveInv();
+    // alchemist from the save: skill and perks; Fortify Alchemy from gear stays manual
+    let alchSet=false;const a=r.alch;
+    if(a&&a.skill!=null){
+      S.skill=Math.max(15,Math.min(100,a.skill));S.alch=a.alch;
+      ["phys","bene","pois","pure"].forEach(k=>S[k]=a[k]);
+      store.set("set",S);syncSettings();alchSet=true;
+    }
+    renderIngs();schedule();
+    const kinds=Object.keys(inv).length,total=Object.values(inv).reduce((a,b)=>a+b,0);
+    gstat(kinds?"done":"noIngs",false,{kinds,total,name:r.name,loc:r.loc,when:file.lastModified,took,alchSet});
+    store.set("lastImport",Date.now());
+  }catch(e){gstat(e&&e.code?e.code:"errRead",true)}
+}
+async function newestSave(dir){
+  let best=null;
+  for await (const h of dir.values()){
+    if(h.kind!=="file"||!/\.ess$/i.test(h.name)) continue;
+    const f=await h.getFile();if(!best||f.lastModified>best.lastModified) best=f;
+  }
+  return best;
+}
+let dirMem=null;
+const kindOf=n=>/^quicksave/i.test(n)?"kQuick":/^autosave/i.test(n)?"kAuto":"kSave";
+async function loadFromGame(){
+  const btn=$("game-load");
+  if(!window.showDirectoryPicker){gstat("pickDirFF");$("game-dir").click();return}
+  btn.disabled=true;
+  try{
+    let dir=dirMem||await idb.get("savesDir");
+    if(dir){
+      try{let perm=await dir.queryPermission({mode:"read"});if(perm!=="granted"){gstat("permAsk");perm=await dir.requestPermission({mode:"read"})}if(perm!=="granted") dir=null}
+      catch(e){dir=null}
+    }
+    if(!dir){gstat("pickDir");dir=await window.showDirectoryPicker({id:"skyrim-saves",startIn:"documents",mode:"read"})}
+    const f=await newestSave(dir);
+    if(!f){dirMem=null;gstat("noSaves",true);await idb.set("savesDir",null);return}
+    dirMem=dir;await idb.set("savesDir",dir);
+    await applySave(f,kindOf(f.name));
+  }catch(e){
+    if(e&&e.name==="AbortError") gstat("noPick");
+    else{gstat("noAccess");$("game-input").click()}
+  }finally{btn.disabled=false}
+}
+$("game-load").onclick=loadFromGame;
+$("game-file").onclick=()=>$("game-input").click();
+$("game-dir").onchange=ev=>{
+  const all=[...ev.target.files].filter(f=>/\.ess$/i.test(f.name)&&!/_old/i.test(f.webkitRelativePath||""));
+  ev.target.value="";
+  if(!all.length){gstat("noSaves",true);return}
+  const f=all.reduce((a,b)=>b.lastModified>a.lastModified?b:a);
+  applySave(f,kindOf(f.name));
+};
+$("game-input").onchange=ev=>{const f=ev.target.files[0];if(f)applySave(f);ev.target.value=""};
+let dragN=0;
+addEventListener("dragenter",e=>{if([...(e.dataTransfer?.types||[])].includes("Files")){dragN++;document.body.classList.add("drag")}});
+addEventListener("dragleave",()=>{if(--dragN<=0){dragN=0;document.body.classList.remove("drag")}});
+addEventListener("dragover",e=>e.preventDefault());
+addEventListener("drop",e=>{e.preventDefault();dragN=0;document.body.classList.remove("drag");const f=[...e.dataTransfer.files].find(f=>/\.ess$/i.test(f.name));if(f)applySave(f);else gstat("dropEss",true)});
+
+/* ---------- start ---------- */
+bindSettings();applyLang();
+$("sample-note").hidden=!isSample;
+if(isSample&&!ui.wanted.length) ui.wanted=[E.findIndex(e=>e.edid==="AlchRestoreHealth")];
+setTab(ui.tab);
+</script>
+
+</body>
+</html>
