@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.2
+- 10 ingredients from the Anniversary Edition Creations (187 in total): Mort Flesh, Steel-Blue Entoloma, Spiddal Stick, Harrada, Bloodgrass, Simon Rodayne's Heart, Corrupted Human Heart, Ironwood Fruit, Healing Salts, Wild Grass Pod. The Nightshade copy from AE counts as regular Nightshade.
+- Help and README: which game versions are tested.
+- tools/extract_data.py: finds ingredients in any Creation Club plugin, reads extra folders (--extra, e.g. an MO2 mod), merges exact copies automatically.
+
 ## 1.0.1
 - Save import: also reads the second, shorter item list that the game sometimes keeps in the player's inventory. Recently picked-up ingredients (for example Human Heart) were missing from the bag.
 

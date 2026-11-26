@@ -3,23 +3,30 @@
 Rebuild Alchemy Table's ingredient and effect data from your own Skyrim SE/AE install.
 
 Usage:
-    python extract_data.py "C:/Steam/steamapps/common/Skyrim Special Edition/Data" --inject ../index.html
+    python extract_data.py "<Skyrim>/Data" [--extra "<MO2>/mods/<mod>" ...] --inject ../index.html
 
-Reads INGR and MGEF records from the official plugins and the English and Russian names
-from the .strings files packed in the BSAs. Writes data.json and fidmap.json next to this
-script; with --inject it also replaces the DATA and FIDMAP lines inside index.html.
+Reads INGR and MGEF records from the official plugins (base game, DLC, and every Creation
+Club / Anniversary Edition plugin that contains ingredients) and the English and Russian
+names from the .strings files packed in the BSAs. Plugins and BSAs are looked up in the Data
+folder and in any --extra folder (for example a Mod Organizer 2 mod that holds the
+Anniversary Edition content). Writes data.json and fidmap.json next to this script; with
+--inject it also replaces the DATA and FIDMAP lines inside index.html.
 Python 3.8+, standard library only.
 """
 import argparse, json, os, re, struct, zlib
 
+# Base game and the four free Creation Club plugins, in load order.
 PLUGINS = ["Skyrim.esm", "Update.esm", "Dawnguard.esm", "HearthFires.esm", "Dragonborn.esm",
            "ccBGSSSE001-Fish.esm", "ccBGSSSE025-AdvDSGS.esm", "ccBGSSSE037-Curios.esl"]
-STRING_BSAS = ["Skyrim - Interface.bsa", "ccBGSSSE001-Fish.bsa", "ccBGSSSE025-AdvDSGS.bsa", "ccBGSSSE037-Curios.bsa"]
+# Any other cc*.esm/esl found in the search folders that contains INGR records is added after
+# these (Anniversary Edition content) and tagged "AE".
 SRC = {"Skyrim.esm": "S", "Update.esm": "S", "Dawnguard.esm": "DG", "HearthFires.esm": "HF", "Dragonborn.esm": "DB",
        "ccBGSSSE001-Fish.esm": "FISH", "ccBGSSSE025-AdvDSGS.esm": "SS", "ccBGSSSE037-Curios.esl": "CUR"}
 LANGS = ["english", "russian"]
 SKIP = {"MS03BlackBriarSecretIngredient"}           # quest item, never usable
 MERGE = {"ccBGSSSE025_FlameStalk": "ccBGSSSE037_FlameStalk"}  # same ingredient shipped twice
+# Other copies (same English name and identical effects as an earlier ingredient) are merged
+# automatically into the earlier one, so the bag shows a single entry.
 
 
 def lz4_block(src, out):
@@ -107,27 +114,41 @@ def subrecords(data):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("data_dir", help="Skyrim Special Edition\\Data folder")
+    ap.add_argument("--extra", action="append", default=[], help="extra folder with plugins/BSAs (repeatable)")
     ap.add_argument("--inject", help="index.html to update in place")
     a = ap.parse_args()
-    D = a.data_dir
+    dirs = [a.data_dir] + a.extra
+    files = {}
+    for d in dirs:
+        for f in os.listdir(d):
+            files.setdefault(f.lower(), os.path.join(d, f))
+    find = lambda name: files.get(name.lower())
+
+    # plugin list: base, then every other cc plugin that contains ingredients
+    order = [p for p in PLUGINS if find(p)]
+    for p in PLUGINS:
+        if not find(p): print("missing, skipped:", p)
+    base_l = {p.lower() for p in PLUGINS}
+    extra = sorted(f for f in files if f.startswith("cc") and f.endswith((".esm", ".esl")) and f not in base_l)
+    for f in extra:
+        if b"INGR" in open(files[f], "rb").read():
+            order.append(os.path.basename(files[f]))
 
     strings = {}
-    for bsa in STRING_BSAS:
-        path = os.path.join(D, bsa)
-        if not os.path.exists(path): continue
+    bsas = ["Skyrim - Interface.bsa"] + [os.path.splitext(p)[0] + ".bsa" for p in order if p.lower().startswith("cc")]
+    for bsa in bsas:
+        path = find(bsa)
+        if not path: continue
         got = bsa_files(path, lambda n: n.startswith("strings") and any(n.endswith("_" + l + ".strings") for l in LANGS))
         for k, v in got.items():
             plug, lang = os.path.basename(k)[:-8].rsplit("_", 1); strings[(plug, lang)] = parse_strings(v)
 
     ingr, mgef = {}, {}
-    for fn in PLUGINS:
-        path = os.path.join(D, fn)
-        if not os.path.exists(path):
-            print("missing, skipped:", fn); continue
-        bb = open(path, "rb").read()
+    for fn in order:
+        bb = open(find(fn), "rb").read()
         hsz = struct.unpack_from("<I", bb, 4)[0]; localized = bool(struct.unpack_from("<I", bb, 8)[0] & 0x80)
         masters = [v.rstrip(b"\0").decode() for t, v in subrecords(bb[24:24 + hsz]) if t == b"MAST"] + [fn]
-        plug = fn.rsplit(".", 1)[0].lower()
+        plug = os.path.splitext(fn)[0].lower()
 
         def name(sv):
             if not localized: return {l: sv.rstrip(b"\0").decode("cp1252", "replace") for l in LANGS}
@@ -165,29 +186,36 @@ def main():
         walk(24 + hsz, len(bb))
 
     used, I, F = {}, [], {}
+    seen = {}  # (english name, effects) -> edid, for automatic merging of copies
     for k, v in ingr.items():
         ed = v.get("edid")
-        if ed in SKIP or not v.get("effects"): continue
+        if ed in SKIP or not v.get("effects") or not v.get("name"): continue
         plug, loc = k.split(":")
-        if ed in MERGE:
-            F[ed] = [plug, int(loc, 16), MERGE[ed]]; continue
+        en = v["name"].get("english") or ed
+        ru = v["name"].get("russian") or en
+        sig = (en, tuple((e["m"], round(e.get("mag", 0), 2), e.get("dur", 0)) for e in v["effects"]))
+        target = MERGE.get(ed) or seen.get(sig)
+        if target and target != ed:
+            F[ed] = [plug, int(loc, 16), target]; continue
+        seen.setdefault(sig, ed)
         effs = []
         for e in v["effects"]:
             used.setdefault(e["m"], len(used))
             effs.append([used[e["m"]], round(e.get("mag", 0), 2), e.get("dur", 0)])
-        src = SRC[v["file"]] + ("+SS" if ed in MERGE.values() else "")
-        I.append([ed, v["name"]["english"], v["name"]["russian"], src, v.get("value"), round(v.get("weight", 0), 3), effs])
+        src = SRC.get(v["file"], "AE") + ("+SS" if ed in MERGE.values() else "")
+        I.append([ed, en, ru, src, v.get("value"), round(v.get("weight", 0), 3), effs])
         F[ed] = [plug, int(loc, 16)]
     E = [None] * len(used)
     for m, idx in used.items():
-        g = mgef.get(m, {}); E[idx] = [g.get("edid"), g["name"]["english"], g["name"]["russian"], g.get("flags", 0), round(g.get("cost", 0), 4)]
+        g = mgef.get(m, {}); nm = g.get("name") or {}
+        E[idx] = [g.get("edid"), nm.get("english"), nm.get("russian") or nm.get("english"), g.get("flags", 0), round(g.get("cost", 0), 4)]
 
     data = json.dumps({"E": E, "I": I}, ensure_ascii=False, separators=(",", ":"))
     fidmap = json.dumps(F, separators=(",", ":"))
     here = os.path.dirname(os.path.abspath(__file__))
     open(os.path.join(here, "data.json"), "w", encoding="utf-8").write(data)
     open(os.path.join(here, "fidmap.json"), "w", encoding="utf-8").write(fidmap)
-    print(f"{len(I)} ingredients, {len(E)} effects")
+    print(f"{len(order)} plugins, {len(I)} ingredients, {len(E)} effects, {len(F) - len(I)} merged copies")
     if a.inject:
         html = open(a.inject, encoding="utf-8").read()
         html = re.sub(r"^const DATA=.*;$", lambda _: "const DATA=" + data + ";", html, count=1, flags=re.M)
