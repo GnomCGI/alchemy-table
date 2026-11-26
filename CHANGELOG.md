@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.3
+- Save import: the second, shorter item list in the inventory is now also read when it holds only two items (White Cap and Imp Stool were missing). The search is limited to the inventory part of the save.
+
 ## 1.0.2
 - 10 ingredients from the Anniversary Edition Creations (187 in total): Mort Flesh, Steel-Blue Entoloma, Spiddal Stick, Harrada, Bloodgrass, Simon Rodayne's Heart, Corrupted Human Heart, Ironwood Fruit, Healing Salts, Wild Grass Pod. The Nightshade copy from AE counts as regular Nightshade.
 - Help and README: which game versions are tested.
