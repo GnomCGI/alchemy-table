@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.4
+- Save import: a short second item list in the inventory was skipped when a misread run of bytes started one byte earlier and overlapped it (a single Crimson Nirnroot was missing). Of the overlapping runs, the one with the real ingredients is now taken. Results on all earlier test saves are unchanged.
+
 ## 1.0.3
 - Save import: the second, shorter item list in the inventory is now also read when it holds only two items (White Cap and Imp Stool were missing). The search is limited to the inventory part of the save.
 
